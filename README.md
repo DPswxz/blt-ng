@@ -1,16 +1,9 @@
-# bilitv
+# 哔哩哔哩TV
 
-A new Flutter project.
+BBLL和bilibilitv都凉了，只能自力更生了
 
-## Getting Started
+目前只实现了首页推荐和简易视频播放，还无法登陆，走的游客模式
 
-This project is a starting point for a Flutter application.
+截图有点糊
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+![首页](https://github.com/kkkunny/bilitv/raw/refs/heads/master/doc/shot.png)
