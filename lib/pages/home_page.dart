@@ -2,10 +2,8 @@ import 'package:bilitv/pages/video_player_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../apis/video.dart';
-import '../data/mock_data.dart';
 import '../models/video.dart';
 import '../widgets/video_card.dart';
-import '../widgets/category_tab.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,10 +13,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final ScrollController _categoryScrollController = ScrollController();
   final ScrollController _videoScrollController = ScrollController();
 
-  int _selectedCategoryIndex = 0;
   int page = 0;
   final pageVideoCount = 30;
   List<VideoCardInfo> _videos = [];
@@ -33,7 +29,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _categoryScrollController.dispose();
     _videoScrollController.dispose();
     super.dispose();
   }
@@ -74,15 +69,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _onCategorySelected(int index) {
-    setState(() {
-      _selectedCategoryIndex = index;
-    });
-    page = 0;
-    _videos.clear();
-    _onRefresh();
-  }
-
   void _onVideoTapped(VideoCardInfo video) {
     Navigator.push(
       context,
@@ -96,9 +82,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      body: Column(
-        children: [_buildAppBar(), _buildCategoryTabs(), _buildVideoGrid()],
-      ),
+      body: Column(children: [_buildAppBar(), _buildVideoGrid()]),
     );
   }
 
@@ -114,7 +98,7 @@ class _HomePageState extends State<HomePage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -165,28 +149,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCategoryTabs() {
-    final categories = MockData.getCategories();
-
-    return Container(
-      height: 60,
-      color: Colors.white,
-      child: ListView.builder(
-        controller: _categoryScrollController,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          return CategoryTab(
-            title: categories[index],
-            isSelected: index == _selectedCategoryIndex,
-            onTap: () => _onCategorySelected(index),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildVideoGrid() {
     if (_isLoading) {
       return Expanded(
@@ -224,6 +186,8 @@ class _HomePageState extends State<HomePage> {
             return Material(
               child: InkWell(
                 onTap: () => _onVideoTapped(_videos[index]),
+                focusColor: Colors.blue.shade100,
+                hoverColor: Colors.blue.shade100,
                 child: VideoCard(video: _videos[index]),
               ),
             );
