@@ -1,4 +1,5 @@
 class VideoCardInfo {
+  final int avid;
   final String bvid;
   final int cid;
   final String title;
@@ -12,6 +13,7 @@ class VideoCardInfo {
   final DateTime publishTime;
 
   VideoCardInfo({
+    required this.avid,
     required this.bvid,
     required this.cid,
     required this.title,
@@ -27,6 +29,7 @@ class VideoCardInfo {
 
   factory VideoCardInfo.fromJson(Map<String, dynamic> json) {
     return VideoCardInfo(
+      avid: json['id'] ?? 0,
       bvid: json['bvid'] ?? '',
       cid: json['cid'] ?? 0,
       title: json['title'] ?? '',
@@ -41,6 +44,35 @@ class VideoCardInfo {
         (json['pubdate'] ?? DateTime.timestamp()) *
             Duration.millisecondsPerSecond,
       ),
+    );
+  }
+}
+
+class VideoPlayInfo {
+  final int order;
+  final Duration length;
+  final int size; // byte
+  final List<String> urls;
+
+  VideoPlayInfo({
+    required this.order,
+    required this.length,
+    required this.size,
+    required this.urls,
+  });
+
+  factory VideoPlayInfo.fromJson(Map<String, dynamic> json) {
+    List<String> urls = [];
+    final url = json['url'] ?? "";
+    if (url == "") {
+      urls.add(url);
+    }
+    urls.addAll((json['backup_url'] ?? []).cast<String>());
+    return VideoPlayInfo(
+      order: json['order'] ?? 0,
+      length: Duration(milliseconds: json['length'] ?? 0),
+      size: json['size'] ?? 0,
+      urls: urls,
     );
   }
 }

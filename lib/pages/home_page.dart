@@ -1,3 +1,4 @@
+import 'package:bilitv/pages/video_player_page.dart';
 import 'package:flutter/material.dart';
 import '../apis/video.dart';
 import '../data/mock_data.dart';
@@ -73,10 +74,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onVideoTapped(VideoCardInfo video) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('点击了视频: ${video.title}'),
-        duration: const Duration(seconds: 2),
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => VideoPlayerPage(video: video),
       ),
     );
   }
