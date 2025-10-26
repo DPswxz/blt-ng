@@ -1,5 +1,7 @@
 import 'package:bilitv/pages/video_player_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../apis/video.dart';
 import '../data/mock_data.dart';
 import '../models/video.dart';
@@ -112,25 +114,19 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Row(
         children: [
-          Container(
+          SvgPicture.network(
+            'https://www.tapafun.com/wp-content/uploads/2024/11/Bilibili_tv_a.svg',
+            fit: BoxFit.cover,
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.pink[400]!, Colors.pink[600]!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.pink.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            placeholderBuilder: (context) => Container(
+              color: Colors.black,
+              child: const Center(child: CircularProgressIndicator()),
             ),
-            child: const Icon(Icons.tv, color: Colors.white, size: 24),
+            errorBuilder: (context, url, error) => Container(
+              color: Colors.black,
+              child: const Icon(Icons.live_tv),
+            ),
           ),
           const SizedBox(width: 16),
           Column(
@@ -147,11 +143,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               Text(
-                '精彩视频，尽在掌握',
+                '发弹幕看视频必备APP',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   color: Colors.grey[600],
-                  fontWeight: FontWeight.w400,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
