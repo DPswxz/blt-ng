@@ -8,8 +8,8 @@ String videoDurationString(Duration duration) {
   return '${duration.inHours}:$ms:$ss';
 }
 
-// 播放量格式化
-String videoViewCountString(int viewCount) {
+// 数量格式化
+String amountString(int viewCount) {
   if (viewCount > 100000000) {
     return '${(viewCount / 100000000).toStringAsFixed(1)}亿';
   } else if (viewCount > 10000) {
@@ -18,4 +18,9 @@ String videoViewCountString(int viewCount) {
     return '${(viewCount / 1000).toStringAsFixed(1)}千';
   }
   return viewCount.toString();
+}
+
+// 日期格式化
+String datetimeString(DateTime dateTime) {
+  return '${dateTime.year.toString().padLeft(4, '0')}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
 }

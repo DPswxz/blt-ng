@@ -1,58 +1,6 @@
 import 'package:bilitv/apis/auth.dart';
-import 'package:dio/dio.dart';
 
 import '../models/video.dart';
-
-final bilibiliHttpClient = Dio(
-  BaseOptions(
-    headers: {
-      'Referer': 'https://www.bilibili.com/',
-      'User-Agent':
-          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0',
-      'Cookie': getCookie(),
-    },
-  ),
-);
-
-// 获取推荐视频
-Future<List<MediaCardInfo>> fetchRecommendVideos({
-  int freshType = 4,
-  int count = 30,
-  int page = 1,
-  List<int> removeAvids = const [],
-}) async {
-  final response = await bilibiliHttpClient.get(
-    'https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd',
-    queryParameters: {
-      'fresh_type': freshType,
-      'ps': count,
-      'fresh_idx': page,
-      'last_show_list': removeAvids.map((v) => 'av_$v').join(','),
-    },
-  );
-  if (response.statusCode != 200) {
-    throw Exception(
-      'http error, code=${response.statusCode}, msg=${response.data}',
-    );
-  }
-  final data = response.data as Map<String, dynamic>;
-  if (data['code'] != 0) {
-    throw Exception(
-      'bilibili api error, code=${data['code']}, msg=${data['message']}',
-    );
-  }
-
-  final List<MediaCardInfo> videos = [];
-  for (final item in data['data']['item']) {
-    // 过滤掉非视频媒体
-    final media = MediaCardInfo.fromJson(item);
-    if (media.type != MediaType.video) {
-      continue;
-    }
-    videos.add(media);
-  }
-  return videos;
-}
 
 // 获取视频播放地址
 Future<List<VideoPlayInfo>> getVideoPlayURL({
@@ -87,4 +35,31 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
     videos.add(VideoPlayInfo.fromJson(item));
   }
   return videos;
+}
+
+// 获取视频信息
+Future<VideoInfo> getVideoInfo({int? avid, String? bvid}) async {
+  Map<String, dynamic> queryParams = {};
+  if (avid != null) {
+    queryParams['aid'] = avid;
+  } else {
+    queryParams['bvid'] = bvid;
+  }
+  final response = await bilibiliHttpClient.get(
+    'https://api.bilibili.com/x/web-interface/view',
+    queryParameters: queryParams,
+  );
+  if (response.statusCode != 200) {
+    throw Exception(
+      'http error, code=${response.statusCode}, msg=${response.data}',
+    );
+  }
+  final data = response.data as Map<String, dynamic>;
+  if (data['code'] != 0) {
+    throw Exception(
+      'bilibili api error, code=${data['code']}, msg=${data['message']}',
+    );
+  }
+
+  return VideoInfo.fromJson(data['data']);
 }

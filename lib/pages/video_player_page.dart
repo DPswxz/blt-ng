@@ -1,11 +1,14 @@
 import 'package:bilitv/apis/video.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../apis/auth.dart';
+
 class VideoPlayerPage extends StatefulWidget {
-  final MediaCardInfo video;
+  final VideoInfo video;
 
   const VideoPlayerPage({super.key, required this.video});
 
@@ -14,6 +17,7 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
+  FocusNode focusNode = FocusNode();
   late final player = Player();
   late final controller = VideoController(player);
 
@@ -48,9 +52,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         child: SizedBox(
           width: MediaQuery.of(context).size.width,
           height: MediaQuery.of(context).size.width * 9.0 / 16.0,
-          child: Video(controller: controller),
+          child: KeyboardListener(
+            autofocus: true,
+            focusNode: focusNode,
+            onKeyEvent: _onKeyEvent,
+            child: Video(controller: controller),
+          ),
         ),
       ),
     );
+  }
+
+  void _onKeyEvent(KeyEvent value) {
+    if (value.runtimeType == KeyUpEvent) {
+      return;
+    }
+    // print('${value.logicalKey.keyLabel}');
+    if (value.logicalKey == LogicalKeyboardKey.select ||
+        value.logicalKey == LogicalKeyboardKey.enter) {
+      player.playOrPause();
+    }
   }
 }

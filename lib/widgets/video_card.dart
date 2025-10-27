@@ -2,7 +2,7 @@ import 'package:bilitv/models/video.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../apis/video.dart';
+import '../apis/auth.dart';
 import '../consts/bilibili.dart';
 
 const videoCardWidth = 400.0;
@@ -22,6 +22,7 @@ class _VideoCardState extends State<VideoCard> {
   Widget build(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Column(
@@ -112,7 +113,7 @@ class _VideoCardState extends State<VideoCard> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  videoViewCountString(widget.video.viewCount),
+                  amountString(widget.video.viewCount),
                   style: TextStyle(fontSize: 12, color: Colors.white),
                 ),
               ],
