@@ -28,7 +28,6 @@ class BiliTVApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
           useMaterial3: true,
-          fontFamily: 'HarmonyOS_Sans_SC',
         ),
         home: const HomePage(),
         debugShowCheckedModeBanner: false,
