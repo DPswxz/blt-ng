@@ -1,3 +1,4 @@
+import 'package:bilitv/apis/auth.dart';
 import 'package:bilitv/utils/scroll_behavior.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,7 +28,6 @@ class BiliTVApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
           useMaterial3: true,
-          fontFamily: 'HarmonyOS_Sans_SC',
         ),
         home: const HomePage(),
         debugShowCheckedModeBanner: false,

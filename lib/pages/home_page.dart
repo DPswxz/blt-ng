@@ -1,8 +1,10 @@
-import 'package:bilitv/pages/video_player_page.dart';
+import 'package:bilitv/apis/rcmd.dart';
+import 'package:bilitv/pages/video_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../apis/video.dart';
 import '../models/video.dart';
+import '../widgets/loading.dart';
 import '../widgets/video_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -17,7 +19,7 @@ class _HomePageState extends State<HomePage> {
 
   int page = 0;
   final pageVideoCount = 30;
-  List<VideoCardInfo> _videos = [];
+  List<MediaCardInfo> _videos = [];
   bool _isLoading = true;
 
   @override
@@ -69,11 +71,23 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _onVideoTapped(VideoCardInfo video) {
+  void _onVideoTapped(MediaCardInfo video) {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => VideoPlayerPage(video: video),
+        builder: (context) => Loading(
+          loader: () async {
+            final v = await getVideoInfo(avid: video.avid);
+            final relatedVs = await fetchRelatedVideos(avid: video.avid);
+            return VideoDetailPageInput(v, relatedVs);
+          },
+          builder: (context, input) {
+            return VideoDetailPage(
+              video: input.video,
+              relatedVideos: input.relatedVideos,
+            );
+          },
+        ),
       ),
     );
   }

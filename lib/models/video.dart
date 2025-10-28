@@ -1,4 +1,13 @@
-class VideoCardInfo {
+enum MediaType {
+  unknown,
+  video, // 视频
+  live, // 直播
+  ogv, // 边栏
+}
+
+// 媒体卡片信息
+class MediaCardInfo {
+  final MediaType type;
   final int avid;
   final String bvid;
   final int cid;
@@ -12,7 +21,8 @@ class VideoCardInfo {
   final String userAvatar;
   final DateTime publishTime;
 
-  VideoCardInfo({
+  MediaCardInfo({
+    required this.type,
     required this.avid,
     required this.bvid,
     required this.cid,
@@ -27,9 +37,14 @@ class VideoCardInfo {
     required this.publishTime,
   });
 
-  factory VideoCardInfo.fromJson(Map<String, dynamic> json) {
-    return VideoCardInfo(
-      avid: json['id'] ?? 0,
+  factory MediaCardInfo.fromJson(Map<String, dynamic> json) {
+    return MediaCardInfo(
+      type: json['goto'] == 'av'
+          ? MediaType.video
+          : (json['goto'] == 'live'
+                ? MediaType.live
+                : (json['goto'] == 'ogv' ? MediaType.ogv : MediaType.unknown)),
+      avid: json['id'] ?? (json['aid'] ?? 0),
       bvid: json['bvid'] ?? '',
       cid: json['cid'] ?? 0,
       title: json['title'] ?? '',
@@ -73,6 +88,63 @@ class VideoPlayInfo {
       length: Duration(milliseconds: json['length'] ?? 0),
       size: json['size'] ?? 0,
       urls: urls,
+    );
+  }
+}
+
+// 视频信息
+class VideoInfo {
+  final int avid;
+  final String bvid;
+  final int cid;
+  final String title;
+  final String cover;
+  final String desc;
+  final Duration duration;
+  final int viewCount;
+  final int likeCount;
+  final int replyCount;
+  final int danmakuCount;
+  final String userName;
+  final String userAvatar;
+  final DateTime publishTime;
+
+  VideoInfo({
+    required this.avid,
+    required this.bvid,
+    required this.cid,
+    required this.title,
+    required this.cover,
+    required this.desc,
+    required this.duration,
+    required this.viewCount,
+    required this.likeCount,
+    required this.replyCount,
+    required this.danmakuCount,
+    required this.userName,
+    required this.userAvatar,
+    required this.publishTime,
+  });
+
+  factory VideoInfo.fromJson(Map<String, dynamic> json) {
+    return VideoInfo(
+      avid: json['aid'] ?? 0,
+      bvid: json['bvid'] ?? '',
+      cid: json['cid'] ?? 0,
+      title: json['title'] ?? '',
+      cover: json['pic'] ?? '',
+      desc: json['desc'] ?? '',
+      duration: Duration(seconds: json['duration'] ?? 0),
+      viewCount: json['stat']['view'] ?? 0,
+      likeCount: json['stat']['like'] ?? 0,
+      replyCount: json['stat']['reply'] ?? 0,
+      danmakuCount: json['stat']['danmaku'] ?? 0,
+      userName: json['owner']['name'] ?? '',
+      userAvatar: json['owner']['face'] ?? '',
+      publishTime: DateTime.fromMillisecondsSinceEpoch(
+        (json['pubdate'] ?? DateTime.timestamp()) *
+            Duration.millisecondsPerSecond,
+      ),
     );
   }
 }
