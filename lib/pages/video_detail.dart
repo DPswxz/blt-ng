@@ -1,5 +1,6 @@
-import 'package:bilitv/apis/rcmd.dart';
-import 'package:bilitv/apis/video.dart';
+import 'package:bilitv/apis/bilibili.dart'
+    show getVideoInfo, fetchRelatedVideos;
+import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/pages/video_player.dart';
 import 'package:bilitv/utils/format.dart';
@@ -7,8 +8,6 @@ import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-
-import '../consts/bilibili.dart';
 
 class VideoDetailPageInput {
   final VideoInfo video;

@@ -1,6 +1,7 @@
+import 'package:bilitv/apis/bilibili.dart'
+    show MySelf, getMySelfInfo, AuthError;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:bilitv/apis/user.dart';
 import 'package:bilitv/storages/cookie.dart' show clearCookie;
 
 class UserInfoPage extends StatefulWidget {
@@ -29,7 +30,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
         _me = info;
         _loading = false;
       });
-    } on AuthError catch (e) {
+    } on AuthError {
       clearCookie();
       widget.loginNotifier.value = false;
     } catch (e) {

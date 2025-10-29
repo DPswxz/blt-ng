@@ -1,9 +1,9 @@
+import 'package:bilitv/apis/bilibili.dart' show bilibiliHttpClient;
+import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../apis/auth.dart';
-import '../consts/bilibili.dart';
 
 const videoCardWidth = 400.0;
 const videoCardHigh = videoCardWidth / coverSizeRatio + 65.0;

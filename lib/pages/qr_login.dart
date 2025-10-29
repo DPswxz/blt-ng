@@ -1,10 +1,9 @@
 import 'dart:async';
 
-import 'package:bilitv/apis/auth.dart';
+import 'package:bilitv/apis/bilibili.dart';
+import 'package:bilitv/storages/cookie.dart' show loadCookie, saveCookie;
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
-import '../storages/cookie.dart' show saveCookie, loadCookie;
 
 class QRLoginPage extends StatefulWidget {
   final ValueNotifier<bool> loginNotifier;
@@ -126,7 +125,6 @@ class _QRLoginPageState extends State<QRLoginPage> {
           style: TextStyle(fontSize: 20, color: Colors.red),
         );
       case QRState.error:
-      default:
         return const Text(
           '发生错误，请重试',
           style: TextStyle(fontSize: 20, color: Colors.red),

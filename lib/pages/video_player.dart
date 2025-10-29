@@ -1,11 +1,10 @@
-import 'package:bilitv/apis/video.dart';
+import 'package:bilitv/apis/bilibili.dart'
+    show getVideoPlayURL, bilibiliHttpClient;
 import 'package:bilitv/models/video.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
-
-import '../apis/auth.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final VideoInfo video;

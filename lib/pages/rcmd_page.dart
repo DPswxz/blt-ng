@@ -1,10 +1,10 @@
-import 'package:bilitv/apis/rcmd.dart';
+import 'package:bilitv/apis/bilibili.dart'
+    show fetchRecommendVideos, getVideoInfo, fetchRelatedVideos;
+import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
+import 'package:bilitv/widgets/loading.dart';
+import 'package:bilitv/widgets/video_card.dart';
 import 'package:flutter/material.dart';
-import '../apis/video.dart';
-import '../models/video.dart';
-import '../widgets/loading.dart';
-import '../widgets/video_card.dart';
 
 class RecommendPage extends StatefulWidget {
   const RecommendPage({super.key});
