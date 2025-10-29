@@ -2,7 +2,7 @@ import 'package:bilitv/utils/scroll_behavior.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
-import 'pages/home_page.dart';
+import 'pages/home.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

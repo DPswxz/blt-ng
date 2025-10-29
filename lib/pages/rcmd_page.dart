@@ -1,5 +1,5 @@
 import 'package:bilitv/apis/rcmd.dart';
-import 'package:bilitv/pages/video_detail_page.dart';
+import 'package:bilitv/pages/video_detail.dart';
 import 'package:flutter/material.dart';
 import '../apis/video.dart';
 import '../models/video.dart';

@@ -67,7 +67,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (value.runtimeType == KeyUpEvent) {
       return;
     }
-    // print('${value.logicalKey.keyLabel}');
     if (value.logicalKey == LogicalKeyboardKey.select ||
         value.logicalKey == LogicalKeyboardKey.enter) {
       player.playOrPause();

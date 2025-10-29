@@ -1,4 +1,4 @@
-import 'package:bilitv/pages/qr_login_page.dart';
+import 'package:bilitv/pages/user_entry.dart';
 import 'package:bilitv/pages/rcmd_page.dart';
 import 'package:flutter/material.dart';
 
@@ -12,7 +12,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   final tabs = [Tab(text: '我的'), Tab(text: '推荐')];
-  final tabChildren = [Center(child: QRLoginPage()), RecommendPage()];
+  final tabChildren = [UserEntryPage(), RecommendPage()];
   late TabController _tabController;
   late List<FocusNode> _tabFocusNodes;
 

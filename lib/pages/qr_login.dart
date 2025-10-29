@@ -4,10 +4,12 @@ import 'package:bilitv/apis/auth.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../storages/cookie.dart' show saveCookie;
+import '../storages/cookie.dart' show saveCookie, loadCookie;
 
 class QRLoginPage extends StatefulWidget {
-  const QRLoginPage({super.key});
+  final ValueNotifier<bool> loginNotifier;
+
+  const QRLoginPage({super.key, required this.loginNotifier});
 
   @override
   State<QRLoginPage> createState() => _QRLoginPageState();
@@ -21,13 +23,22 @@ class _QRLoginPageState extends State<QRLoginPage> {
   @override
   void initState() {
     super.initState();
-    _refreshQR();
+    _initCookie();
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initCookie() async {
+    final cookie = await loadCookie();
+    if (cookie.isNotEmpty) {
+      widget.loginNotifier.value = true;
+      return;
+    }
+    await _refreshQR();
   }
 
   Future<void> _refreshQR() async {
@@ -74,6 +85,7 @@ class _QRLoginPageState extends State<QRLoginPage> {
         .map((c) => '${c.name}=${c.value}')
         .join('; ');
     await saveCookie(cookieHeader);
+    widget.loginNotifier.value = true;
   }
 
   Widget _buildQRBox() {
@@ -146,11 +158,6 @@ class _QRLoginPageState extends State<QRLoginPage> {
                   _refreshQR();
                 },
                 child: const Text('刷新二维码'),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
               ),
             ],
           ),

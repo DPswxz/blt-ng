@@ -1,7 +1,7 @@
 import 'package:bilitv/apis/rcmd.dart';
 import 'package:bilitv/apis/video.dart';
 import 'package:bilitv/models/video.dart';
-import 'package:bilitv/pages/video_player_page.dart';
+import 'package:bilitv/pages/video_player.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
