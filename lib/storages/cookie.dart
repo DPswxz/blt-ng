@@ -1,11 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ValueNotifier;
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _cookieKey = 'bilibili_cookie';
 
 // debug: 是否从环境变量中读取cookie
 var _loadFromEnv = true;
+
+final ValueNotifier<bool> loginNotifier = ValueNotifier(false);
 
 Future<void> saveCookie(String cookie) async {
   final prefs = await SharedPreferences.getInstance();

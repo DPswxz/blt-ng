@@ -255,8 +255,9 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
   int? avid,
   String? bvid,
   required int cid,
+  int quality = 32,
 }) async {
-  Map<String, dynamic> queryParams = {'cid': cid};
+  Map<String, dynamic> queryParams = {'cid': cid, 'qn': quality};
   if (avid != null) {
     queryParams['avid'] = avid;
   } else {
