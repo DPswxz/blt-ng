@@ -1,14 +1,13 @@
-import 'package:bilitv/apis/rcmd.dart';
-import 'package:bilitv/apis/video.dart';
+import 'package:bilitv/apis/bilibili.dart'
+    show getVideoInfo, fetchRelatedVideos;
+import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/models/video.dart';
-import 'package:bilitv/pages/video_player_page.dart';
+import 'package:bilitv/pages/video_player.dart';
 import 'package:bilitv/utils/format.dart';
+import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-
-import '../consts/bilibili.dart';
 
 class VideoDetailPageInput {
   final VideoInfo video;
@@ -45,7 +44,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => Loading(
+        builder: (context) => LoadingWidget(
           loader: () async {
             final v = await getVideoInfo(avid: video.avid);
             final relatedVs = await fetchRelatedVideos(avid: video.avid);
@@ -107,20 +106,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
-                        imageUrl: widget.video.cover,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.black,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.black,
-                          child: const Icon(Icons.error, color: Colors.white),
-                        ),
-                      ),
+                      child: BilibiliNetworkImage(widget.video.cover),
                     ),
                   ),
                 ),
@@ -249,20 +235,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                         child: SizedBox(
                           width: 48,
                           height: 48,
-                          child: CachedNetworkImage(
-                            imageUrl: widget.video.userAvatar,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[300],
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.person),
-                            ),
-                          ),
+                          child: BilibiliAvatar(widget.video.userAvatar),
                         ),
                       ),
                       const SizedBox(width: 12),
