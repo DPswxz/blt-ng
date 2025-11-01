@@ -1,5 +1,5 @@
-import 'package:bilitv/apis/bilibili.dart'
-    show MySelf, getMySelfInfo, AuthError;
+import 'package:bilitv/apis/bilibili/error.dart';
+import 'package:bilitv/apis/bilibili/user.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:flutter/material.dart';
 import 'package:bilitv/storages/cookie.dart' show clearCookie, loginNotifier;
@@ -28,9 +28,15 @@ class _UserInfoPageState extends State<UserInfoPage> {
         _me = info;
         _loading = false;
       });
-    } on AuthError {
-      clearCookie();
-      loginNotifier.value = false;
+    } on BilibiliError catch (e) {
+      if (e == noLoginError) {
+        clearCookie();
+        loginNotifier.value = false;
+      } else {
+        setState(() {
+          _loading = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _loading = false;

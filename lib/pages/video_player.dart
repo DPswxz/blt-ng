@@ -1,5 +1,5 @@
-import 'package:bilitv/apis/bilibili.dart'
-    show getVideoPlayURL, bilibiliHttpClient;
+import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
+import 'package:bilitv/apis/bilibili/media.dart' show getVideoPlayURL;
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/storages/cookie.dart';
 import 'package:flutter/material.dart';

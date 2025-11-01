@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bilitv/apis/bilibili.dart';
+import 'package:bilitv/apis/bilibili/auth.dart';
 import 'package:bilitv/storages/cookie.dart'
     show loadCookie, saveCookie, loginNotifier;
 import 'package:flutter/material.dart';
