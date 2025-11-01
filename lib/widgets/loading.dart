@@ -39,7 +39,7 @@ class _Loading<T> extends State<LoadingWidget<T>> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset("assets/loading.gif"),
+            Image.asset("assets/images/loading/loading1.gif"),
             const SizedBox(height: 16),
             Text(
               '加载中...',

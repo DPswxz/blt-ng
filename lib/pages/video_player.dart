@@ -58,7 +58,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             autofocus: true,
             focusNode: focusNode,
             onKeyEvent: _onKeyEvent,
-            child: Video(controller: controller),
+            child: Video(controller: controller, controls: NoVideoControls),
           ),
         ),
       ),
