@@ -4,6 +4,8 @@ import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
+import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 class RecommendPage extends StatefulWidget {
@@ -50,7 +52,24 @@ class _RecommendPageState extends State<RecommendPage> {
         _isLoading = true;
       });
 
-      fetchRecommendVideos(page: page, count: pageVideoCount).then((videos) {
+      fetchRecommendVideos(page: page, count: pageVideoCount).then((
+        videos,
+      ) async {
+        // 预缓存封面图片, 减少用户滚动时的图片加载卡顿
+        for (var v in videos) {
+          try {
+            await precacheImage(
+              CachedNetworkImageProvider(
+                v.cover,
+                headers: bilibiliHttpClient.options.headers
+                    .cast<String, String>(),
+              ),
+              context,
+            );
+          } catch (_) {}
+        }
+
+        if (!mounted) return;
         setState(() {
           _videos = videos;
           _isLoading = false;

@@ -11,7 +11,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  final tabs = [Tab(text: '我的'), Tab(text: '推荐')];
+  final tabs = const [Tab(text: '我的'), Tab(text: '推荐')];
   final tabChildren = [UserEntryPage(), RecommendPage()];
   late TabController _tabController;
   late List<FocusNode> _tabFocusNodes;

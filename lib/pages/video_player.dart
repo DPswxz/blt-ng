@@ -400,7 +400,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (value.runtimeType == KeyUpEvent) {
       return;
     }
-    print('${value.runtimeType} ${value.logicalKey}');
 
     final step = Duration(seconds: 5);
     switch (value.logicalKey) {
