@@ -41,9 +41,9 @@ class _Loading<T> extends State<LoadingWidget<T>> {
           children: [
             Image.asset("assets/images/loading/loading1.gif"),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               '加载中...',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ],
         ),
