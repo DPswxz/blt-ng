@@ -4,13 +4,13 @@ import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
-import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
-import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
 class RecommendPage extends StatefulWidget {
-  const RecommendPage({super.key});
+  final ValueNotifier<int> _clickedListener;
+
+  const RecommendPage(this._clickedListener, {super.key});
 
   @override
   State<RecommendPage> createState() => _RecommendPageState();
@@ -21,15 +21,16 @@ class _RecommendPageState extends State<RecommendPage> {
 
   int page = 0;
   final pageVideoCount = 30;
-  List<MediaCardInfo> _videos = [];
-  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
+  final List<MediaCardInfo> _videos = [];
+  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
   bool _isLoadingMore = false;
 
   @override
   void initState() {
-    super.initState();
-    _onRefresh();
     _videoScrollController.addListener(_onListenScroll);
+    widget._clickedListener.addListener(_onRefresh);
+    super.initState();
+    _pullMoreVideos();
   }
 
   @override
@@ -38,86 +39,63 @@ class _RecommendPageState extends State<RecommendPage> {
     super.dispose();
   }
 
-  // Simple debounce to avoid multiple rapid loads when user hits the edge
-  DateTime? _lastLoad;
+  DateTime? _lastRefresh;
+  void _onRefresh() {
+    if (_isLoading.value) return;
+
+    final now = DateTime.now();
+    if (_lastRefresh != null &&
+        now.difference(_lastRefresh!).inMilliseconds < 500) {
+      return;
+    }
+    _lastRefresh = now;
+
+    page = 0;
+    _videos.clear();
+    _pullMoreVideos();
+  }
+
+  DateTime? _lastLoadMore;
   void _onListenScroll() {
-    if (!_videoScrollController.position.atEdge ||
+    if (_isLoading.value ||
+        _isLoadingMore ||
+        !_videoScrollController.position.atEdge ||
         _videoScrollController.position.pixels == 0) {
       return;
     }
 
     final now = DateTime.now();
-    if (_lastLoad != null && now.difference(_lastLoad!).inMilliseconds < 500) {
+    if (_lastLoadMore != null &&
+        now.difference(_lastLoadMore!).inMilliseconds < 500) {
       return;
     }
-    _lastLoad = now;
+    _lastLoadMore = now;
 
-    // Prevent concurrent load-more requests
-    if (_isLoadingMore) return;
     _isLoadingMore = true;
-    _onRefresh();
-    // reset flag when done (in _onRefresh completion handlers)
+    _pullMoreVideos();
   }
 
-  void _onRefresh() {
+  // 拉取更多视频
+  Future<void> _pullMoreVideos() async {
+    final isFirst = page == 0;
     page++;
 
-    if (_videos.isEmpty) {
-      _isLoading.value = true;
+    if (isFirst) _isLoading.value = true;
 
-      // The following block captures BuildContext and uses it with precacheImage after awaits.
-      // We ensure mounted checks and accept the small risk; suppress the lint for this block.
-      // ignore: use_build_context_synchronously
-      fetchRecommendVideos(page: page, count: pageVideoCount).then((videos) async {
-          // Preload images without using BuildContext to avoid async-context lint
-        Future<void> preloadImage(ImageProvider provider) {
-          final completer = Completer<void>();
-          final stream = provider.resolve(const ImageConfiguration());
-          late ImageStreamListener listener;
-          listener = ImageStreamListener((_, __) {
-            completer.complete();
-            stream.removeListener(listener);
-          }, onError: (_, __) {
-            completer.complete();
-            stream.removeListener(listener);
-          });
-          stream.addListener(listener);
-          return completer.future;
-        }
-
-        final first = videos.take(6).toList();
-        try {
-          await Future.wait(first.map((v) => preloadImage(CachedNetworkImageProvider(
-                v.cover,
-                headers: bilibiliHttpClient.options.headers.cast<String, String>(),
-              ))));
-        } catch (_) {}
-
-        // background preload remaining images (fire-and-forget)
-        for (var v in videos.skip(6)) {
-          preloadImage(CachedNetworkImageProvider(
-            v.cover,
-            headers: bilibiliHttpClient.options.headers.cast<String, String>(),
-          ));
-        }
-
-        if (!mounted) return;
-        _videos = videos;
-        _isLoading.value = false;
-      });
-      return;
-    }
-
-    fetchRecommendVideos(
+    final videos = await fetchRecommendVideos(
       page: page,
       count: pageVideoCount,
       removeAvids: _videos.map((e) => e.avid).toList(),
-    ).then((videos) {
-      setState(() {
-        _videos.addAll(videos);
-        _isLoadingMore = false;
-      });
-    });
+    );
+
+    if (!mounted) return;
+    _videos.addAll(videos);
+    _isLoadingMore = false;
+    if (isFirst) {
+      _isLoading.value = false;
+    } else {
+      setState(() {});
+    }
   }
 
   void _onVideoTapped(MediaCardInfo video) {
