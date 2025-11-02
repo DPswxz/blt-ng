@@ -8,9 +8,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class RecommendPage extends StatefulWidget {
-  final ValueNotifier<int> _clickedListener;
+  final ValueNotifier<int> _tappedListener;
 
-  const RecommendPage(this._clickedListener, {super.key});
+  const RecommendPage(this._tappedListener, {super.key});
 
   @override
   State<RecommendPage> createState() => _RecommendPageState();
@@ -28,7 +28,7 @@ class _RecommendPageState extends State<RecommendPage> {
   @override
   void initState() {
     _videoScrollController.addListener(_onListenScroll);
-    widget._clickedListener.addListener(_onRefresh);
+    widget._tappedListener.addListener(_onRefresh);
     super.initState();
   }
 

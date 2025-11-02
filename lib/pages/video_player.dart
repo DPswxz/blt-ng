@@ -1,7 +1,7 @@
 import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
 import 'package:bilitv/apis/bilibili/media.dart' show getVideoPlayURL;
 import 'package:bilitv/consts/bilibili.dart' show VideoQuality;
-import 'package:bilitv/models/video.dart';
+import 'package:bilitv/models/video.dart' as model;
 import 'package:bilitv/storages/cookie.dart';
 import 'package:bilitv/utils/format.dart' show videoDurationString;
 import 'package:flutter/material.dart';
@@ -324,9 +324,10 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
 
 // 视频播放页
 class VideoPlayerPage extends StatefulWidget {
-  final VideoInfo video;
+  final model.Video video;
+  final int cid;
 
-  const VideoPlayerPage({super.key, required this.video});
+  const VideoPlayerPage({super.key, required this.video, required this.cid});
 
   @override
   State<VideoPlayerPage> createState() => _VideoPlayerPageState();
@@ -364,7 +365,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   _onQualityChange() async {
     final infos = await getVideoPlayURL(
       avid: widget.video.avid,
-      cid: widget.video.cid,
+      cid: widget.cid,
       quality: currentQuality.value.index,
     );
     await controller.player.open(

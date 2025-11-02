@@ -92,62 +92,106 @@ class VideoPlayInfo {
   }
 }
 
-// 视频信息
-class VideoInfo {
-  final int avid;
-  final String bvid;
-  final int cid;
-  final String title;
-  final String cover;
-  final String desc;
-  final Duration duration;
+// 视频统计信息
+class VideoStat {
   final int favoriteCount;
   final int likeCount;
   final int dislikeCount;
   final int coinCount;
   final int shareCount;
-  final String userName;
-  final String userAvatar;
-  final DateTime publishTime;
-
-  VideoInfo({
-    required this.avid,
-    required this.bvid,
-    required this.cid,
-    required this.title,
-    required this.cover,
-    required this.desc,
-    required this.duration,
+  VideoStat({
     required this.favoriteCount,
     required this.likeCount,
     required this.dislikeCount,
     required this.coinCount,
     required this.shareCount,
+  });
+  factory VideoStat.fromJson(Map<String, dynamic> json) {
+    return VideoStat(
+      favoriteCount: json['favorite'] ?? 0,
+      likeCount: json['like'] ?? 0,
+      dislikeCount: json['dislike'] ?? 0,
+      coinCount: json['coin'] ?? 0,
+      shareCount: json['share'] ?? 0,
+    );
+  }
+}
+
+// 剧集信息
+class Episode {
+  final int index; // 从1开始
+  final int cid;
+  final String title;
+  final Duration duration;
+
+  const Episode({
+    required this.index,
+    required this.cid,
+    required this.title,
+    required this.duration,
+  });
+
+  factory Episode.fromJson(Map<String, dynamic> json) {
+    return Episode(
+      index: json['page'] ?? 1,
+      cid: json['cid'] ?? 0,
+      title: json['part'] ?? '',
+      duration: Duration(seconds: json['duration'] ?? 0),
+    );
+  }
+}
+
+// 视频信息
+class Video {
+  final int avid;
+  final String bvid;
+  final String title;
+  final String cover;
+  final String desc;
+  final Duration duration;
+  final VideoStat stat;
+  final String userName;
+  final String userAvatar;
+  final DateTime publishTime;
+  final int cid; // 分P起始位置
+  final List<Episode> episodes; // 分P
+
+  Video({
+    required this.avid,
+    required this.bvid,
+    required this.title,
+    required this.cover,
+    required this.desc,
+    required this.duration,
+    required this.stat,
     required this.userName,
     required this.userAvatar,
     required this.publishTime,
+    required this.cid,
+    required this.episodes,
   });
 
-  factory VideoInfo.fromJson(Map<String, dynamic> json) {
-    return VideoInfo(
+  factory Video.fromJson(Map<String, dynamic> json) {
+    final episodes = ((json['pages'] ?? []) as List<dynamic>)
+        .map((e) => Episode.fromJson(e))
+        .toList();
+    episodes.sort((a, b) => a.index.compareTo(b.index));
+    return Video(
       avid: json['aid'] ?? 0,
       bvid: json['bvid'] ?? '',
-      cid: json['cid'] ?? 0,
       title: json['title'] ?? '',
       cover: json['pic'] ?? '',
       desc: json['desc'] ?? '',
       duration: Duration(seconds: json['duration'] ?? 0),
-      favoriteCount: json['stat']['favorite'] ?? 0,
-      likeCount: json['stat']['like'] ?? 0,
-      dislikeCount: json['stat']['dislike'] ?? 0,
-      coinCount: json['stat']['coin'] ?? 0,
-      shareCount: json['stat']['share'] ?? 0,
+      stat: VideoStat.fromJson(json['stat'] ?? {}),
       userName: json['owner']['name'] ?? '',
       userAvatar: json['owner']['face'] ?? '',
       publishTime: DateTime.fromMillisecondsSinceEpoch(
         (json['pubdate'] ?? DateTime.timestamp()) *
             Duration.millisecondsPerSecond,
       ),
+      cid: json['cid'] ?? 0,
+      episodes: episodes,
     );
   }
 }

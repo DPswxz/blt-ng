@@ -11,14 +11,14 @@ import 'package:bilitv/widgets/video_card.dart';
 import 'package:flutter/material.dart';
 
 class VideoDetailPageInput {
-  final VideoInfo video;
+  final Video video;
   final List<MediaCardInfo> relatedVideos;
 
   VideoDetailPageInput(this.video, this.relatedVideos);
 }
 
 class VideoDetailPage extends StatefulWidget {
-  final VideoInfo video;
+  final Video video;
   final List<MediaCardInfo> relatedVideos;
 
   const VideoDetailPage({
@@ -32,11 +32,14 @@ class VideoDetailPage extends StatefulWidget {
 }
 
 class _VideoDetailPageState extends State<VideoDetailPage> {
+  late final _currentEpisodeCid = ValueNotifier(widget.video.cid);
+
   void _onCoverTapped() {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => VideoPlayerPage(video: widget.video),
+        builder: (context) =>
+            VideoPlayerPage(video: widget.video, cid: _currentEpisodeCid.value),
       ),
     );
   }
@@ -64,19 +67,26 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final children = widget.video.episodes.length == 1
+        ? [
+            _buildVideoHeader(),
+            const SizedBox(height: 24),
+            _buildRelatedVideos(),
+          ]
+        : [
+            _buildVideoHeader(),
+            const SizedBox(height: 24),
+            _buildEpisodes(),
+            const SizedBox(height: 24),
+            _buildRelatedVideos(),
+          ];
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildVideoHeader(),
-            // const SizedBox(height: 24),
-            // _buildVideoEpisodes(),
-            const SizedBox(height: 24),
-            _buildRelatedVideos(),
-          ],
+          children: children,
         ),
       ),
     );
@@ -91,7 +101,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: InkWell(
-          onTap: () => _onCoverTapped(),
+          onTap: _onCoverTapped,
           focusColor: Colors.blue.shade100,
           hoverColor: Colors.blue.shade100,
           child: Padding(
@@ -133,7 +143,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    height: 170,
+                    height: 110,
                     child: Text(
                       widget.video.title,
                       style: const TextStyle(
@@ -141,7 +151,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                         fontWeight: FontWeight.w900,
                         color: Colors.black,
                       ),
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -153,6 +163,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
+                          focusColor: Colors.blue.shade100,
+                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -163,7 +175,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                                 color: Colors.grey,
                               ),
                               Text(
-                                amountString(widget.video.likeCount),
+                                amountString(widget.video.stat.likeCount),
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.grey.shade600,
@@ -179,6 +191,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
+                          focusColor: Colors.blue.shade100,
+                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -191,7 +205,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                                 ),
                               ),
                               Text(
-                                amountString(widget.video.dislikeCount),
+                                amountString(widget.video.stat.dislikeCount),
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.grey.shade600,
@@ -207,12 +221,14 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
+                          focusColor: Colors.blue.shade100,
+                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
                               Icon(IconFont.coin, size: 40, color: Colors.grey),
                               Text(
-                                amountString(widget.video.coinCount),
+                                amountString(widget.video.stat.coinCount),
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.grey.shade600,
@@ -228,6 +244,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
+                          focusColor: Colors.blue.shade100,
+                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -237,7 +255,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                                 color: Colors.grey,
                               ),
                               Text(
-                                amountString(widget.video.favoriteCount),
+                                amountString(widget.video.stat.favoriteCount),
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.grey.shade600,
@@ -253,6 +271,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
+                          focusColor: Colors.blue.shade100,
+                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -262,7 +282,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                                 color: Colors.grey,
                               ),
                               Text(
-                                amountString(widget.video.shareCount),
+                                amountString(widget.video.stat.shareCount),
                                 style: TextStyle(
                                   fontSize: 20,
                                   color: Colors.grey.shade600,
@@ -352,58 +372,90 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     );
   }
 
-  Widget _buildVideoEpisodes() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '视频分P',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
+  void _onEpisodeTapped(Episode episode) {
+    _currentEpisodeCid.value = episode.cid;
+  }
+
+  Widget _buildEpisodes() {
+    final children = widget.video.episodes
+        .map(
+          (episode) => ValueListenableBuilder(
+            valueListenable: _currentEpisodeCid,
+            builder: (context, cid, _) => MaterialButton(
+              color: Colors.grey[100],
+              disabledColor: Colors.pinkAccent.shade100,
+              focusColor: Colors.blue.shade100,
+              hoverColor: Colors.blue.shade100,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.play_circle_outline,
-                    size: 32,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'P1 ${widget.video.title}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
+              onPressed: episode.cid == cid
+                  ? null
+                  : () => _onEpisodeTapped(episode),
+              child: Container(
+                width: 200,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'P${episode.index}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    videoDurationString(widget.video.duration),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      episode.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      videoDurationString(episode.duration),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
+        )
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '视频分P',
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            color: Colors.black,
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            height: 120,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: children,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

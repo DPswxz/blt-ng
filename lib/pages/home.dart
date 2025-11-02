@@ -12,10 +12,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   final _tabs = const [Tab(text: '我的'), Tab(text: '推荐')];
-  final _tabClickedListeners = [ValueNotifier(0), ValueNotifier(0)];
+  final _tabTappedListeners = [ValueNotifier(0), ValueNotifier(0)];
   late final List<StatefulWidget> _tabChildren = [
-    UserEntryPage(_tabClickedListeners[0]),
-    RecommendPage(_tabClickedListeners[1]),
+    UserEntryPage(_tabTappedListeners[0]),
+    RecommendPage(_tabTappedListeners[1]),
   ];
   late TabController _tabController;
   late List<FocusNode> _tabFocusNodes;
@@ -30,7 +30,7 @@ class _HomePageState extends State<HomePage>
   @override
   void dispose() {
     _tabController.dispose();
-    for (var listener in _tabClickedListeners) {
+    for (var listener in _tabTappedListeners) {
       listener.dispose();
     }
     for (var node in _tabFocusNodes) {
@@ -49,7 +49,7 @@ class _HomePageState extends State<HomePage>
   }
 
   _onTabChicked(index) {
-    _tabClickedListeners[index].value = DateTime.now().microsecondsSinceEpoch;
+    _tabTappedListeners[index].value = DateTime.now().microsecondsSinceEpoch;
   }
 
   @override

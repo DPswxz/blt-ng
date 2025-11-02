@@ -1,4 +1,4 @@
-import 'package:bilitv/models/video.dart' show VideoPlayInfo, VideoInfo;
+import 'package:bilitv/models/video.dart' show VideoPlayInfo, Video;
 
 import 'client.dart';
 
@@ -27,7 +27,7 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
 }
 
 // 获取视频信息
-Future<VideoInfo> getVideoInfo({int? avid, String? bvid}) async {
+Future<Video> getVideoInfo({int? avid, String? bvid}) async {
   Map<String, dynamic> queryParams = {};
   if (avid != null) {
     queryParams['aid'] = avid;
@@ -38,5 +38,5 @@ Future<VideoInfo> getVideoInfo({int? avid, String? bvid}) async {
     'https://api.bilibili.com/x/web-interface/view',
     queryParameters: queryParams,
   );
-  return VideoInfo.fromJson(data);
+  return Video.fromJson(data);
 }
