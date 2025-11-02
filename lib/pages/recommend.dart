@@ -137,8 +137,6 @@ class _RecommendPageState extends State<RecommendPage> {
               return Material(
                 child: InkWell(
                   onTap: () => _onVideoTapped(_videos[index]),
-                  focusColor: Colors.blue.shade100,
-                  hoverColor: Colors.blue.shade100,
                   child: VideoCard(video: _videos[index]),
                 ),
               );

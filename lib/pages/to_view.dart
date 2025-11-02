@@ -94,8 +94,6 @@ class _ToViewPageState extends State<ToViewPage> {
               return Material(
                 child: InkWell(
                   onTap: () => _onVideoTapped(_videos[index]),
-                  focusColor: Colors.blue.shade100,
-                  hoverColor: Colors.blue.shade100,
                   child: VideoCard(video: _videos[index]),
                 ),
               );

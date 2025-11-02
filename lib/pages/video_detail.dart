@@ -102,8 +102,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
         padding: const EdgeInsets.all(10),
         child: InkWell(
           onTap: _onCoverTapped,
-          focusColor: Colors.blue.shade100,
-          hoverColor: Colors.blue.shade100,
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Stack(
@@ -163,8 +161,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          focusColor: Colors.blue.shade100,
-                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -191,8 +187,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          focusColor: Colors.blue.shade100,
-                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -221,8 +215,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          focusColor: Colors.blue.shade100,
-                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -244,8 +236,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          focusColor: Colors.blue.shade100,
-                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -271,8 +261,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          focusColor: Colors.blue.shade100,
-                          hoverColor: Colors.blue.shade100,
                           onPressed: () {},
                           child: Column(
                             children: [
@@ -500,8 +488,6 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
             return Material(
               child: InkWell(
                 onTap: () => _onVideoTapped(widget.relatedVideos[index]),
-                focusColor: Colors.blue.shade100,
-                hoverColor: Colors.blue.shade100,
                 child: VideoCard(video: widget.relatedVideos[index]),
               ),
             );
