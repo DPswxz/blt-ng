@@ -2,6 +2,7 @@ import 'package:bilitv/pages/to_view.dart';
 import 'package:bilitv/pages/user_entry.dart';
 import 'package:bilitv/pages/recommend.dart';
 import 'package:flutter/material.dart';
+import 'package:bilitv/widgets/keep_alive.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,10 +19,10 @@ class _HomePageState extends State<HomePage>
     ValueNotifier(0),
     ValueNotifier(0),
   ];
-  late final List<StatefulWidget> _tabChildren = [
-    UserEntryPage(_tabTappedListeners[0]),
-    ToViewPage(_tabTappedListeners[1]),
-    RecommendPage(_tabTappedListeners[2]),
+  late final List<Widget> _tabChildren = [
+    KeepAliveWidget(child: UserEntryPage(_tabTappedListeners[0])),
+    KeepAliveWidget(child: ToViewPage(_tabTappedListeners[1])),
+    KeepAliveWidget(child: RecommendPage(_tabTappedListeners[2])),
   ];
   late TabController _tabController;
   late List<FocusNode> _tabFocusNodes;
@@ -54,7 +55,7 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  _onTabChicked(index) {
+  _onTabTapped(index) {
     _tabTappedListeners[index].value = DateTime.now().microsecondsSinceEpoch;
   }
 
@@ -72,15 +73,9 @@ class _HomePageState extends State<HomePage>
           ),
         ).toList(),
         onFocusChange: _onTabFocusChanged,
-        onTap: _onTabChicked,
+        onTap: _onTabTapped,
       ),
-      // 使用 IndexedStack 使各 tab 的子 widget 在应用启动时就被构建并保持状态
-      body: ListenableBuilder(
-        listenable: _tabController,
-        builder: (context, index) {
-          return _tabChildren[_tabController.index];
-        },
-      ),
+      body: TabBarView(controller: _tabController, children: _tabChildren),
     );
   }
 }
