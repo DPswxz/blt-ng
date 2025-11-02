@@ -77,11 +77,8 @@ class _HomePageState extends State<HomePage>
       // 使用 IndexedStack 使各 tab 的子 widget 在应用启动时就被构建并保持状态
       body: ListenableBuilder(
         listenable: _tabController,
-        builder: (context, _) {
-          return IndexedStack(
-            index: _tabController.index,
-            children: _tabChildren,
-          );
+        builder: (context, index) {
+          return _tabChildren[_tabController.index];
         },
       ),
     );

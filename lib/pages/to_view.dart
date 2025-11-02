@@ -78,7 +78,11 @@ class _ToViewPageState extends State<ToViewPage> {
   Widget build(BuildContext context) {
     return LoadingWidget(
       isLoading: _isLoading,
-      loader: _onRefresh,
+      loader: () async {
+        final videos = await listToView();
+        _videos.addAll(videos);
+        return;
+      },
       builder: (context, _) {
         return Container(
           padding: const EdgeInsets.all(16),
