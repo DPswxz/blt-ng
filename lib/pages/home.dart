@@ -18,13 +18,9 @@ class _HomePageState extends State<HomePage>
 
   @override
   void initState() {
-    super.initState();
     _tabController = TabController(vsync: this, length: tabs.length);
     _tabFocusNodes = tabs.map((e) => FocusNode()).toList();
-    // 当 TabController 索引变化时刷新，以便 IndexedStack 切换显示
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    super.initState();
   }
 
   @override
@@ -59,9 +55,14 @@ class _HomePageState extends State<HomePage>
         },
       ),
       // 使用 IndexedStack 使各 tab 的子 widget 在应用启动时就被构建并保持状态
-      body: IndexedStack(
-        index: _tabController.index,
-        children: tabChildren,
+      body: ListenableBuilder(
+        listenable: _tabController,
+        builder: (context, child) {
+          return IndexedStack(
+            index: _tabController.index,
+            children: tabChildren,
+          );
+        },
       ),
     );
   }
