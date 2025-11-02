@@ -35,6 +35,7 @@ class _RecommendPageState extends State<RecommendPage> {
   @override
   void dispose() {
     _videoScrollController.dispose();
+    widget._tappedListener.removeListener(_onRefresh);
     super.dispose();
   }
 

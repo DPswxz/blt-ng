@@ -1,5 +1,6 @@
+import 'package:bilitv/pages/to_view.dart';
 import 'package:bilitv/pages/user_entry.dart';
-import 'package:bilitv/pages/rcmd_page.dart';
+import 'package:bilitv/pages/recommend.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
@@ -11,11 +12,16 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
-  final _tabs = const [Tab(text: '我的'), Tab(text: '推荐')];
-  final _tabTappedListeners = [ValueNotifier(0), ValueNotifier(0)];
+  final _tabs = const [Tab(text: '我的'), Tab(text: '稍后再看'), Tab(text: '推荐')];
+  final _tabTappedListeners = [
+    ValueNotifier(0),
+    ValueNotifier(0),
+    ValueNotifier(0),
+  ];
   late final List<StatefulWidget> _tabChildren = [
     UserEntryPage(_tabTappedListeners[0]),
-    RecommendPage(_tabTappedListeners[1]),
+    ToViewPage(_tabTappedListeners[1]),
+    RecommendPage(_tabTappedListeners[2]),
   ];
   late TabController _tabController;
   late List<FocusNode> _tabFocusNodes;
@@ -61,7 +67,7 @@ class _HomePageState extends State<HomePage>
           _tabs.length,
           (index) => FocusableActionDetector(
             focusNode: _tabFocusNodes[index],
-            autofocus: index == 1,
+            autofocus: index == 2,
             child: _tabs[index],
           ),
         ).toList(),

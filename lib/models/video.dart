@@ -14,9 +14,7 @@ class MediaCardInfo {
   final String title;
   final String cover;
   final Duration duration;
-  final int viewCount;
-  final int likeCount;
-  final int danmakuCount;
+  final Stat stat;
   final String userName;
   final String userAvatar;
   final DateTime publishTime;
@@ -29,9 +27,7 @@ class MediaCardInfo {
     required this.title,
     required this.cover,
     required this.duration,
-    required this.viewCount,
-    required this.likeCount,
-    required this.danmakuCount,
+    required this.stat,
     required this.userName,
     required this.userAvatar,
     required this.publishTime,
@@ -44,15 +40,13 @@ class MediaCardInfo {
           : (json['goto'] == 'live'
                 ? MediaType.live
                 : (json['goto'] == 'ogv' ? MediaType.ogv : MediaType.unknown)),
-      avid: json['id'] ?? (json['aid'] ?? 0),
+      avid: json['aid'] ?? (json['id'] ?? 0),
       bvid: json['bvid'] ?? '',
       cid: json['cid'] ?? 0,
       title: json['title'] ?? '',
       cover: json['pic'] ?? '',
       duration: Duration(seconds: json['duration'] ?? 0),
-      viewCount: json['stat']['view'] ?? 0,
-      likeCount: json['stat']['like'] ?? 0,
-      danmakuCount: json['stat']['danmaku'] ?? 0,
+      stat: Stat.fromJson(json['stat'] ?? {}),
       userName: json['owner']['name'] ?? '',
       userAvatar: json['owner']['face'] ?? '',
       publishTime: DateTime.fromMillisecondsSinceEpoch(
@@ -92,22 +86,25 @@ class VideoPlayInfo {
   }
 }
 
-// 视频统计信息
-class VideoStat {
+// 统计信息
+class Stat {
+  final int viewCount;
   final int favoriteCount;
   final int likeCount;
   final int dislikeCount;
   final int coinCount;
   final int shareCount;
-  VideoStat({
+  Stat({
+    required this.viewCount,
     required this.favoriteCount,
     required this.likeCount,
     required this.dislikeCount,
     required this.coinCount,
     required this.shareCount,
   });
-  factory VideoStat.fromJson(Map<String, dynamic> json) {
-    return VideoStat(
+  factory Stat.fromJson(Map<String, dynamic> json) {
+    return Stat(
+      viewCount: json['view'] ?? 0,
       favoriteCount: json['favorite'] ?? 0,
       likeCount: json['like'] ?? 0,
       dislikeCount: json['dislike'] ?? 0,
@@ -149,7 +146,7 @@ class Video {
   final String cover;
   final String desc;
   final Duration duration;
-  final VideoStat stat;
+  final Stat stat;
   final String userName;
   final String userAvatar;
   final DateTime publishTime;
@@ -183,7 +180,7 @@ class Video {
       cover: json['pic'] ?? '',
       desc: json['desc'] ?? '',
       duration: Duration(seconds: json['duration'] ?? 0),
-      stat: VideoStat.fromJson(json['stat'] ?? {}),
+      stat: Stat.fromJson(json['stat'] ?? {}),
       userName: json['owner']['name'] ?? '',
       userAvatar: json['owner']['face'] ?? '',
       publishTime: DateTime.fromMillisecondsSinceEpoch(
