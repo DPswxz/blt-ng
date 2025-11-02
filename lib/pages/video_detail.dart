@@ -44,7 +44,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => LoadingWidget(
+        builder: (context) => LoadingPage(
           loader: () async {
             final v = await getVideoInfo(avid: video.avid);
             final relatedVs = await fetchRelatedVideos(avid: video.avid);

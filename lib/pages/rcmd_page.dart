@@ -22,7 +22,7 @@ class _RecommendPageState extends State<RecommendPage> {
   int page = 0;
   final pageVideoCount = 30;
   final List<MediaCardInfo> _videos = [];
-  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
   bool _isLoadingMore = false;
 
   @override
@@ -30,7 +30,6 @@ class _RecommendPageState extends State<RecommendPage> {
     _videoScrollController.addListener(_onListenScroll);
     widget._clickedListener.addListener(_onRefresh);
     super.initState();
-    _pullMoreVideos();
   }
 
   @override
@@ -50,9 +49,12 @@ class _RecommendPageState extends State<RecommendPage> {
     }
     _lastRefresh = now;
 
+    _isLoading.value = true;
     page = 0;
     _videos.clear();
-    _pullMoreVideos();
+    _pullMoreVideos().then((_) {
+      _isLoading.value = false;
+    });
   }
 
   DateTime? _lastLoadMore;
@@ -77,10 +79,7 @@ class _RecommendPageState extends State<RecommendPage> {
 
   // 拉取更多视频
   Future<void> _pullMoreVideos() async {
-    final isFirst = page == 0;
     page++;
-
-    if (isFirst) _isLoading.value = true;
 
     final videos = await fetchRecommendVideos(
       page: page,
@@ -89,20 +88,17 @@ class _RecommendPageState extends State<RecommendPage> {
     );
 
     if (!mounted) return;
-    _videos.addAll(videos);
-    _isLoadingMore = false;
-    if (isFirst) {
-      _isLoading.value = false;
-    } else {
-      setState(() {});
-    }
+    setState(() {
+      _videos.addAll(videos);
+      _isLoadingMore = false;
+    });
   }
 
   void _onVideoTapped(MediaCardInfo video) {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (context) => LoadingWidget(
+        builder: (context) => LoadingPage(
           loader: () async {
             final v = await getVideoInfo(avid: video.avid);
             final relatedVs = await fetchRelatedVideos(avid: video.avid);
@@ -121,27 +117,10 @@ class _RecommendPageState extends State<RecommendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _isLoading,
-      builder: (context, isLoading, _) {
-        if (isLoading) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.pink[500]!),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '加载中...',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ],
-            ),
-          );
-        }
-
+    return LoadingWidget(
+      isLoading: _isLoading,
+      loader: _pullMoreVideos,
+      builder: (context, _) {
         return Container(
           padding: const EdgeInsets.all(16),
           child: GridView.builder(
