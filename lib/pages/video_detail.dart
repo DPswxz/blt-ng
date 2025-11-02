@@ -1,5 +1,5 @@
-import 'package:bilitv/apis/bilibili.dart'
-    show getVideoInfo, fetchRelatedVideos;
+import 'package:bilitv/apis/bilibili/media.dart' show getVideoInfo;
+import 'package:bilitv/apis/bilibili/rcmd.dart' show fetchRelatedVideos;
 import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/pages/video_player.dart';

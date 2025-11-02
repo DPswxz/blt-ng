@@ -1,13 +1,16 @@
-import 'package:bilitv/apis/bilibili.dart'
-    show fetchRecommendVideos, getVideoInfo, fetchRelatedVideos;
+import 'package:bilitv/apis/bilibili/media.dart' show getVideoInfo;
+import 'package:bilitv/apis/bilibili/rcmd.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_card.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 class RecommendPage extends StatefulWidget {
-  const RecommendPage({super.key});
+  final ValueNotifier<int> _clickedListener;
+
+  const RecommendPage(this._clickedListener, {super.key});
 
   @override
   State<RecommendPage> createState() => _RecommendPageState();
@@ -18,14 +21,16 @@ class _RecommendPageState extends State<RecommendPage> {
 
   int page = 0;
   final pageVideoCount = 30;
-  List<MediaCardInfo> _videos = [];
-  bool _isLoading = true;
+  final List<MediaCardInfo> _videos = [];
+  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(false);
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
-    super.initState();
-    _onRefresh();
     _videoScrollController.addListener(_onListenScroll);
+    widget._clickedListener.addListener(_onRefresh);
+    super.initState();
+    _pullMoreVideos();
   }
 
   @override
@@ -34,40 +39,63 @@ class _RecommendPageState extends State<RecommendPage> {
     super.dispose();
   }
 
+  DateTime? _lastRefresh;
+  void _onRefresh() {
+    if (_isLoading.value) return;
+
+    final now = DateTime.now();
+    if (_lastRefresh != null &&
+        now.difference(_lastRefresh!).inMilliseconds < 500) {
+      return;
+    }
+    _lastRefresh = now;
+
+    page = 0;
+    _videos.clear();
+    _pullMoreVideos();
+  }
+
+  DateTime? _lastLoadMore;
   void _onListenScroll() {
-    if (!_videoScrollController.position.atEdge ||
+    if (_isLoading.value ||
+        _isLoadingMore ||
+        !_videoScrollController.position.atEdge ||
         _videoScrollController.position.pixels == 0) {
       return;
     }
-    _onRefresh();
-  }
 
-  void _onRefresh() {
-    page++;
-
-    if (_videos.isEmpty) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      fetchRecommendVideos(page: page, count: pageVideoCount).then((videos) {
-        setState(() {
-          _videos = videos;
-          _isLoading = false;
-        });
-      });
+    final now = DateTime.now();
+    if (_lastLoadMore != null &&
+        now.difference(_lastLoadMore!).inMilliseconds < 500) {
       return;
     }
+    _lastLoadMore = now;
 
-    fetchRecommendVideos(
+    _isLoadingMore = true;
+    _pullMoreVideos();
+  }
+
+  // 拉取更多视频
+  Future<void> _pullMoreVideos() async {
+    final isFirst = page == 0;
+    page++;
+
+    if (isFirst) _isLoading.value = true;
+
+    final videos = await fetchRecommendVideos(
       page: page,
       count: pageVideoCount,
       removeAvids: _videos.map((e) => e.avid).toList(),
-    ).then((videos) {
-      setState(() {
-        _videos.addAll(videos);
-      });
-    });
+    );
+
+    if (!mounted) return;
+    _videos.addAll(videos);
+    _isLoadingMore = false;
+    if (isFirst) {
+      _isLoading.value = false;
+    } else {
+      setState(() {});
+    }
   }
 
   void _onVideoTapped(MediaCardInfo video) {
@@ -93,46 +121,51 @@ class _RecommendPageState extends State<RecommendPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.pink[500]!),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '加载中...',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        controller: _videoScrollController,
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: videoCardWidth,
-          mainAxisExtent: videoCardHigh + 8,
-          mainAxisSpacing: 20,
-          crossAxisSpacing: 20,
-        ),
-        itemCount: _videos.length,
-        itemBuilder: (context, index) {
-          return Material(
-            child: InkWell(
-              onTap: () => _onVideoTapped(_videos[index]),
-              focusColor: Colors.blue.shade100,
-              hoverColor: Colors.blue.shade100,
-              child: VideoCard(video: _videos[index]),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isLoading,
+      builder: (context, isLoading, _) {
+        if (isLoading) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.pink[500]!),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '加载中...',
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+              ],
             ),
           );
-        },
-      ),
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: GridView.builder(
+            controller: _videoScrollController,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: videoCardWidth,
+              mainAxisExtent: videoCardHigh + 8,
+              mainAxisSpacing: 20,
+              crossAxisSpacing: 20,
+            ),
+            itemCount: _videos.length,
+            itemBuilder: (context, index) {
+              return Material(
+                child: InkWell(
+                  onTap: () => _onVideoTapped(_videos[index]),
+                  focusColor: Colors.blue.shade100,
+                  hoverColor: Colors.blue.shade100,
+                  child: VideoCard(video: _videos[index]),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

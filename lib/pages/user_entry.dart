@@ -4,7 +4,9 @@ import 'package:bilitv/pages/qr_login.dart';
 import 'package:bilitv/pages/user_info.dart';
 
 class UserEntryPage extends StatefulWidget {
-  const UserEntryPage({super.key});
+  final ValueNotifier<int> _clickedListener;
+
+  const UserEntryPage(this._clickedListener, {super.key});
 
   @override
   State<UserEntryPage> createState() => _UserEntryPageState();

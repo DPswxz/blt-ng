@@ -7,26 +7,23 @@ import 'package:flutter/material.dart';
 const videoCardWidth = 400.0;
 const videoCardHigh = videoCardWidth / coverSizeRatio + 65.0;
 
-class VideoCard extends StatefulWidget {
+class VideoCard extends StatelessWidget {
   final MediaCardInfo video;
 
   const VideoCard({super.key, required this.video});
 
   @override
-  State<VideoCard> createState() => _VideoCardState();
-}
-
-class _VideoCardState extends State<VideoCard> {
-  @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 4,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildThumbnail(), _buildVideoInfo()],
+    return RepaintBoundary(
+      child: Card(
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+        elevation: 4,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [_buildThumbnail(), _buildVideoInfo()],
+          ),
         ),
       ),
     );
@@ -38,7 +35,7 @@ class _VideoCardState extends State<VideoCard> {
         SizedBox(
           width: videoCardWidth,
           height: videoCardWidth / coverSizeRatio,
-          child: BilibiliNetworkImage(widget.video.cover),
+          child: BilibiliNetworkImage(video.cover),
         ),
         Positioned(
           top: 8,
@@ -55,13 +52,13 @@ class _VideoCardState extends State<VideoCard> {
                   child: SizedBox(
                     width: 20,
                     height: 20,
-                    child: BilibiliAvatar(widget.video.userAvatar),
+                    child: BilibiliAvatar(video.userAvatar),
                   ),
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  widget.video.userName,
-                  style: TextStyle(fontSize: 12, color: Colors.white),
+                  video.userName,
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -90,7 +87,7 @@ class _VideoCardState extends State<VideoCard> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  amountString(widget.video.viewCount),
+                  amountString(video.viewCount),
                   style: TextStyle(fontSize: 12, color: Colors.white),
                 ),
               ],
@@ -118,7 +115,7 @@ class _VideoCardState extends State<VideoCard> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  videoDurationString(widget.video.duration),
+                  videoDurationString(video.duration),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -140,7 +137,7 @@ class _VideoCardState extends State<VideoCard> {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: Colors.white),
       child: Text(
-        widget.video.title,
+        video.title,
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,

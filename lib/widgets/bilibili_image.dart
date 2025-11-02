@@ -1,4 +1,4 @@
-import 'package:bilitv/apis/bilibili.dart' show bilibiliHttpClient;
+import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImage, CachedNetworkImageProvider;
 import 'package:flutter/material.dart';

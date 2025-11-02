@@ -11,26 +11,33 @@ class LoadingWidget<T> extends StatefulWidget {
 }
 
 class _Loading<T> extends State<LoadingWidget<T>> {
-  bool _isLoading = true;
+  final _isLoading = ValueNotifier(true);
   late T _data;
 
   @override
   void initState() {
     super.initState();
     widget.loader().then((data) {
-      setState(() {
-        _data = data;
-        _isLoading = false;
-      });
+      _data = data;
+      _isLoading.value = false;
     });
   }
 
   @override
+  void dispose() {
+    _isLoading.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildLoading();
-    }
-    return widget.builder(context, _data);
+    return ValueListenableBuilder<bool>(
+      valueListenable: _isLoading,
+      builder: (context, isLoading, _) {
+        if (isLoading) return _buildLoading();
+        return widget.builder(context, _data);
+      },
+    );
   }
 
   Widget _buildLoading() {
@@ -39,11 +46,11 @@ class _Loading<T> extends State<LoadingWidget<T>> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset("assets/loading.gif"),
+            Image.asset("assets/images/loading/loading1.gif"),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               '加载中...',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+              style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
           ],
         ),
