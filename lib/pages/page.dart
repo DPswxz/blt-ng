@@ -1,5 +1,5 @@
 import 'package:bilitv/pages/to_view.dart';
-import 'package:bilitv/pages/user_entry.dart';
+import 'package:bilitv/pages/user.dart';
 import 'package:bilitv/pages/recommend.dart';
 import 'package:bilitv/storages/cookie.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
@@ -107,7 +107,15 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    BilibiliAvatar(loginInfoNotifier.value.avatar, radius: 30),
+                    ListenableBuilder(
+                      listenable: loginInfoNotifier,
+                      builder: (context, child) {
+                        return BilibiliAvatar(
+                          loginInfoNotifier.value.avatar,
+                          radius: 30,
+                        );
+                      },
+                    ),
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.symmetric(

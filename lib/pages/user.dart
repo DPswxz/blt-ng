@@ -13,15 +13,17 @@ class UserEntryPage extends StatefulWidget {
 }
 
 class _UserEntryPageState extends State<UserEntryPage> {
+  final _loginNotifier = ValueNotifier(loginInfoNotifier.value.isLogin);
+
   @override
   void initState() {
     super.initState();
-    loginInfoNotifier.addListener(_onLoginChanged);
+    _loginNotifier.addListener(_onLoginChanged);
   }
 
   @override
   void dispose() {
-    loginInfoNotifier.removeListener(_onLoginChanged);
+    _loginNotifier.removeListener(_onLoginChanged);
     super.dispose();
   }
 
@@ -31,9 +33,9 @@ class _UserEntryPageState extends State<UserEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (loginInfoNotifier.value.isLogin) {
-      return const UserInfoPage();
+    if (_loginNotifier.value) {
+      return UserInfoPage(_loginNotifier);
     }
-    return const QRLoginPage();
+    return QRLoginPage(_loginNotifier);
   }
 }

@@ -1,5 +1,5 @@
 import 'package:bilitv/pages/to_view.dart';
-import 'package:bilitv/pages/user_entry.dart';
+import 'package:bilitv/pages/user.dart';
 import 'package:bilitv/pages/recommend.dart';
 import 'package:flutter/material.dart';
 import 'package:bilitv/widgets/keep_alive.dart';
