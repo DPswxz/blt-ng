@@ -1,11 +1,11 @@
-import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
+import 'package:bilitv/widgets/text.dart';
 import 'package:flutter/material.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
-const videoCardWidth = 400.0;
+const videoCardAspectRatio = 1.2;
 
 class VideoCard extends StatelessWidget {
   final MediaCardInfo video;
@@ -18,18 +18,22 @@ class VideoCard extends StatelessWidget {
     return VisibilityDetector(
       key: Key(video.avid.toString()),
       onVisibilityChanged: null,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: videoCardWidth,
+      child: AspectRatio(
+        aspectRatio: videoCardAspectRatio,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [_buildCover(), ?_buildProgress(), _buildTitle()],
+                children: [
+                  _buildCover(),
+                  ?_buildProgress(),
+                  _buildTitle(context),
+                ],
               ),
             ),
           ),
@@ -53,11 +57,7 @@ class VideoCard extends StatelessWidget {
   Widget _buildCover() {
     return Stack(
       children: [
-        SizedBox(
-          width: videoCardWidth,
-          height: videoCardWidth / coverSizeRatio,
-          child: BilibiliNetworkImage(video.cover),
-        ),
+        BilibiliMediaThumbnail(video.cover),
         Positioned(
           top: 8,
           left: 8,
@@ -184,21 +184,16 @@ class VideoCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle() {
+  Widget _buildTitle(BuildContext context) {
     return Expanded(
       child: Container(
-        width: videoCardWidth,
-        padding: const EdgeInsets.all(10),
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
         color: Colors.white,
-        child: Text(
+        child: FixedLineAdaptiveText(
           video.title,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-            height: 1.5,
-          ),
-          maxLines: 2,
+          line: 2,
+          lineHeight: 1.4,
           overflow: TextOverflow.ellipsis,
         ),
       ),

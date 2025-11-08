@@ -134,16 +134,13 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            AspectRatio(
-              aspectRatio: coverSizeRatio,
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: BilibiliNetworkImage(widget.video.cover),
-                ),
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: BilibiliMediaThumbnail(widget.video.cover),
               ),
             ),
             Icon(Icons.play_circle_sharp, size: 150, color: Colors.black54),
@@ -504,9 +501,12 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
         addRepaintBoundaries: false,
         scrollDirection: Axis.horizontal,
         itemCount: _relatedVideosProvider.length,
-        itemBuilder: (BuildContext context, int index) => VideoCard(
-          video: _relatedVideosProvider[index],
-          onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
+        itemBuilder: (BuildContext context, int index) => SizedBox(
+          width: 400,
+          child: VideoCard(
+            video: _relatedVideosProvider[index],
+            onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
+          ),
         ),
       ),
     );
