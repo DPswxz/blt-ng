@@ -2,7 +2,8 @@ import 'dart:async';
 
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
-import 'package:bilitv/apis/bilibili/media.dart' show getVideoPlayURL;
+import 'package:bilitv/apis/bilibili/media.dart'
+    show getVideoPlayURL, getMediaPlayInfo, MediaPlayInfo;
 import 'package:bilitv/consts/bilibili.dart' show VideoQuality;
 import 'package:bilitv/consts/color.dart';
 import 'package:bilitv/icons/iconfont.dart';
@@ -425,6 +426,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> _onEpisodeChanged() async {
+    MediaPlayInfo? playInfo;
+    try {
+      playInfo = await getMediaPlayInfo(
+        avid: widget.video.avid,
+        cid: currentCid.value,
+      );
+    } catch (_) {}
+
     final infos = await getVideoPlayURL(
       avid: widget.video.avid,
       cid: currentCid.value,
@@ -434,6 +443,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       Media(
         infos.first.urls.first,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
+        start: playInfo?.lastPlayTime,
       ),
     );
   }
