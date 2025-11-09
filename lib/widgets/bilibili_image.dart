@@ -1,8 +1,15 @@
 import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
+import 'package:bilitv/consts/assets.dart';
 import 'package:bilitv/consts/bilibili.dart' show coverSizeRatio;
 import 'package:cached_network_image/cached_network_image.dart'
     show CachedNetworkImage, CachedNetworkImageProvider;
 import 'package:flutter/material.dart';
+
+// bilibili网络图片提供方，带上了header
+class BilibiliNetworkImageProvider extends CachedNetworkImageProvider {
+  BilibiliNetworkImageProvider(super.url)
+    : super(headers: bilibiliHttpClient.options.headers.cast<String, String>());
+}
 
 // bilibili网络图片，带上了header
 class BilibiliNetworkImage extends CachedNetworkImage {
@@ -37,14 +44,10 @@ class BilibiliAvatar extends CircleAvatar {
     super.radius,
     void Function(Object, StackTrace?)? onError,
   }) : super(
-         backgroundImage: AssetImage("assets/images/noface.webp"),
+         backgroundImage: AssetImage(Images.noface),
          foregroundImage: url == null
              ? null
-             : CachedNetworkImageProvider(
-                 url,
-                 headers: bilibiliHttpClient.options.headers
-                     .cast<String, String>(),
-               ),
+             : BilibiliNetworkImageProvider(url),
          onForegroundImageError: onError,
        );
 }

@@ -1,4 +1,5 @@
 import 'package:bilitv/apis/bilibili/toview.dart';
+import 'package:bilitv/consts/assets.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/storages/cookie.dart';
@@ -76,7 +77,10 @@ class _ToViewPageState extends State<ToViewPage> {
       loader: _onInitData,
       builder: (context, _) {
         if (_videos.isEmpty) {
-          return Center(child: Image.asset("assets/images/empty.png"));
+          return FractionallySizedBox(
+            widthFactor: 0.2,
+            child: Image.asset(Images.empty, fit: BoxFit.contain),
+          );
         }
 
         return Container(
