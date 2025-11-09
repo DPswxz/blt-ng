@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:bilitv/apis/bilibili/auth.dart';
+import 'package:bilitv/apis/bilibili/error.dart';
 import 'package:bilitv/models/video.dart' show VideoPlayInfo, Video;
+import 'package:bilitv/storages/cookie.dart' show loadCookie, saveCookie;
 
 import 'client.dart';
 
@@ -15,7 +20,8 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
   } else {
     queryParams['bvid'] = bvid;
   }
-  final data = await bilibiliGet(
+  final data = await bilibiliRequest(
+    'GET',
     'https://api.bilibili.com/x/player/wbi/playurl',
     queryParameters: queryParams,
   );
@@ -34,7 +40,8 @@ Future<Video> getVideoInfo({int? avid, String? bvid}) async {
   } else {
     queryParams['bvid'] = bvid;
   }
-  final data = await bilibiliGet(
+  final data = await bilibiliRequest(
+    'GET',
     'https://api.bilibili.com/x/web-interface/view',
     queryParameters: queryParams,
   );
@@ -42,14 +49,14 @@ Future<Video> getVideoInfo({int? avid, String? bvid}) async {
 }
 
 class ArchiveRelation {
-  final bool like;
-  final bool dislike;
-  final bool favorite;
-  final bool inPlayList;
-  final int coin;
-  final bool seasonFav;
+  bool like;
+  bool dislike;
+  bool favorite;
+  bool inPlayList;
+  int coin;
+  bool seasonFav;
 
-  const ArchiveRelation({
+  ArchiveRelation({
     this.like = false,
     this.dislike = false,
     this.favorite = false,
@@ -78,7 +85,8 @@ Future<ArchiveRelation> getArchiveRelation({int? avid, String? bvid}) async {
   } else {
     queryParams['bvid'] = bvid;
   }
-  final data = await bilibiliGet(
+  final data = await bilibiliRequest(
+    'GET',
     'https://api.bilibili.com/x/web-interface/archive/relation',
     queryParameters: queryParams,
   );
