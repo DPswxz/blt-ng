@@ -61,7 +61,7 @@ class _ToViewPageState extends State<ToViewPage> {
     _isLoading.value = false;
   }
 
-  void _onVideoTapped(MediaCardInfo video) {
+  void _onVideoTapped(_, MediaCardInfo video) {
     Navigator.push(
       context,
       MaterialPageRoute<void>(

@@ -54,6 +54,33 @@ class _RecommendPageState extends State<RecommendPage> {
     });
   }
 
+  void _onVideoTapped(_, MediaCardInfo video) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => VideoDetailPageWrap(avid: video.avid),
+      ),
+    );
+  }
+
+  bool _isFetchingMore = false;
+  DateTime? _lastFetchMore;
+  Future<void> _onVideoFocused(int index, MediaCardInfo video) async {
+    final lastLine = (index / 5).floor() == ((_videos.length - 1) / 5).floor();
+    if (!lastLine || _isFetchingMore) return;
+
+    final now = DateTime.now();
+    if (_lastFetchMore != null &&
+        now.difference(_lastFetchMore!).inMilliseconds < 500) {
+      return;
+    }
+    _lastFetchMore = now;
+
+    _isFetchingMore = true;
+    await _videos.fetchData(isFetchMore: true);
+    _isFetchingMore = false;
+  }
+
   Future<(List<MediaCardInfo>, bool)> _pullMoreVideos({
     bool isFetchMore = false,
   }) async {
@@ -68,15 +95,6 @@ class _RecommendPageState extends State<RecommendPage> {
     return (videos, true);
   }
 
-  void _onVideoTapped(MediaCardInfo video) {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (context) => VideoDetailPageWrap(avid: video.avid),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return LoadingWidget(
@@ -87,7 +105,11 @@ class _RecommendPageState extends State<RecommendPage> {
       builder: (context, _) {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: VideoGridView(provider: _videos, onTap: _onVideoTapped),
+          child: VideoGridView(
+            provider: _videos,
+            onTap: _onVideoTapped,
+            onFocus: _onVideoFocused,
+          ),
         );
       },
     );

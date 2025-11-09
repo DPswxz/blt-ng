@@ -10,8 +10,9 @@ const videoCardAspectRatio = 1.2;
 class VideoCard extends StatelessWidget {
   final MediaCardInfo video;
   final void Function()? onTap;
+  final void Function()? onFocus;
 
-  const VideoCard({super.key, required this.video, this.onTap});
+  const VideoCard({super.key, required this.video, this.onTap, this.onFocus});
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +23,10 @@ class VideoCard extends StatelessWidget {
         aspectRatio: videoCardAspectRatio,
         child: InkWell(
           onTap: onTap,
+          onFocusChange: (focus) {
+            if (!focus || onFocus == null) return;
+            onFocus!();
+          },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(8),
