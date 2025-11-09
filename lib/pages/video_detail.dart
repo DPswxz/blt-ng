@@ -1,7 +1,6 @@
 import 'package:bilitv/apis/bilibili/media.dart'
     show getVideoInfo, getArchiveRelation, ArchiveRelation;
 import 'package:bilitv/apis/bilibili/rcmd.dart' show fetchRelatedVideos;
-import 'package:bilitv/consts/bilibili.dart';
 import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/pages/video_player.dart';
@@ -103,8 +102,16 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   @override
   Widget build(BuildContext context) {
     final children = widget.video.episodes.length == 1
-        ? [_buildVideoHeader(), _buildRelatedVideos()]
-        : [_buildVideoHeader(), _buildEpisodes(), _buildRelatedVideos()];
+        ? [
+            Expanded(flex: 3, child: _buildVideoHeader()),
+            const Spacer(flex: 1),
+            Expanded(flex: 2, child: _buildRelatedVideos()),
+          ]
+        : [
+            Expanded(flex: 3, child: _buildVideoHeader()),
+            Expanded(flex: 1, child: _buildEpisodes()),
+            Expanded(flex: 2, child: _buildRelatedVideos()),
+          ];
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,9 +121,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   }
 
   Widget _buildVideoHeader() {
-    final height = MediaQuery.of(context).size.height / 2;
-    return Container(
-      height: height,
+    return Padding(
       padding: const EdgeInsets.all(10),
       child: Row(
         children: [_buildVideoPlayer(), SizedBox(width: 10), _buildVideoInfo()],
@@ -410,66 +415,67 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   }
 
   Widget _buildEpisodes() {
-    final height = MediaQuery.of(context).size.height / 2 / 3;
     final children = widget.video.episodes
         .map(
-          (episode) => Container(
-            width: 200,
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.pinkAccent.shade100, Colors.blue.shade100],
-              ),
-            ),
-            child: ValueListenableBuilder(
-              valueListenable: _currentEpisodeCid,
-              builder: (context, cid, child) => MaterialButton(
-                color: episode.cid == cid ? Colors.pinkAccent.shade100 : null,
-                focusColor: episode.cid == cid
-                    ? Colors.lightBlueAccent
-                    : Colors.blue.shade100,
-                hoverColor: episode.cid == cid
-                    ? Colors.lightBlueAccent
-                    : Colors.blue.shade100,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          (episode) => AspectRatio(
+            aspectRatio: 1.5,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.pinkAccent.shade100, Colors.blue.shade100],
                 ),
-                onPressed: () => _onEpisodeTapped(episode),
-                child: child,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'P${episode.index}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+              child: ValueListenableBuilder(
+                valueListenable: _currentEpisodeCid,
+                builder: (context, cid, child) => MaterialButton(
+                  color: episode.cid == cid ? Colors.pinkAccent.shade100 : null,
+                  focusColor: episode.cid == cid
+                      ? Colors.lightBlueAccent
+                      : Colors.blue.shade100,
+                  hoverColor: episode.cid == cid
+                      ? Colors.lightBlueAccent
+                      : Colors.blue.shade100,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onPressed: () => _onEpisodeTapped(episode),
+                  child: child,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'P${episode.index}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      episode.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                      const SizedBox(height: 8),
+                      Text(
+                        episode.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      videoDurationString(episode.duration),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        videoDurationString(episode.duration),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -477,36 +483,27 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
         )
         .toList();
 
-    return Container(
-      height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          height: 120,
-          child: ListView(scrollDirection: Axis.horizontal, children: children),
-        ),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        child: ListView(scrollDirection: Axis.horizontal, children: children),
       ),
     );
   }
 
   Widget _buildRelatedVideos() {
-    final height = MediaQuery.of(context).size.height / 2 / 3 * 2;
-    return Container(
-      height: height,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       child: ListView.builder(
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: false,
         scrollDirection: Axis.horizontal,
         itemCount: _relatedVideosProvider.length,
-        itemBuilder: (BuildContext context, int index) => SizedBox(
-          width: 400,
-          child: VideoCard(
-            video: _relatedVideosProvider[index],
-            onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
-          ),
+        itemBuilder: (BuildContext context, int index) => VideoCard(
+          video: _relatedVideosProvider[index],
+          onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
         ),
       ),
     );
