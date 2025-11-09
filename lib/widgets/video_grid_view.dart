@@ -89,8 +89,8 @@ class VideoGridView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 5,
+    final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 400,
       childAspectRatio: videoCardAspectRatio,
       mainAxisSpacing: 20,
       crossAxisSpacing: 20,
