@@ -14,7 +14,7 @@ class _PageItem {
     required this.icon,
     required Widget Function(ValueNotifier<int>) child,
   }) {
-    this.child = KeepAliveWidget(child: child(onTappedListener));
+    this.child = child(onTappedListener);
   }
 
   void dispose() {
@@ -41,7 +41,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
     ),
     _PageItem(
       icon: Icons.home_max_rounded,
-      child: (listener) => RecommendPage(listener),
+      child: (listener) => KeepAliveWidget(child: RecommendPage(listener)),
     ),
   ];
   late PageController _pageController;
