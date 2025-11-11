@@ -90,11 +90,11 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
         ? pos.inMilliseconds
         : _lastPushDanmakuTime!.inMilliseconds;
     _lastPushDanmakuTime = pos;
-    final needPushDanmakuList = _danmakuCache!.$2.elems
-        .where(
-          (e) => lastPushMS <= e.progress && e.progress < pos.inMilliseconds,
-        )
-        .toList();
+    final needPushDanmakuList = _danmakuCache!.$2.elems.where((e) {
+      // 屏蔽权重
+      if (e.weight < 5) return false;
+      return lastPushMS <= e.progress && e.progress < pos.inMilliseconds;
+    }).toList();
     if (needPushDanmakuList.isEmpty) return;
     _onPushDanmaku(needPushDanmakuList);
   }
