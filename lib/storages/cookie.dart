@@ -10,14 +10,29 @@ var _loadFromEnv = true;
 
 class LoginInfo {
   final bool isLogin;
+  final int? mid;
   final String? nickname;
   final String? avatar;
 
-  const LoginInfo({required this.isLogin, this.nickname, this.avatar});
+  const LoginInfo({
+    required this.isLogin,
+    this.mid,
+    this.nickname,
+    this.avatar,
+  });
 
   static const notLogin = LoginInfo(isLogin: false);
-  static login({required String nickname, required String avatar}) {
-    return LoginInfo(isLogin: true, nickname: nickname, avatar: avatar);
+  static login({
+    required int mid,
+    required String nickname,
+    required String avatar,
+  }) {
+    return LoginInfo(
+      isLogin: true,
+      mid: mid,
+      nickname: nickname,
+      avatar: avatar,
+    );
   }
 }
 

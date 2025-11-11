@@ -434,6 +434,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> _onEpisodeChanged() async {
+    // 上报播放开始
+    reportPlayStart(widget.video.avid, currentCid.value);
+
     MediaPlayInfo? playInfo;
     // 若已登陆，获取播放进度
     if (loginInfoNotifier.value.isLogin) {

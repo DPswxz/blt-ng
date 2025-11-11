@@ -84,9 +84,10 @@ Future<QRStatus> checkQRStatus(String key) async {
   final data = await bilibiliRequest(
     'GET',
     'https://passport.bilibili.com/x/passport-login/web/qrcode/poll',
-    queryParameters: {'qrcode_key': key},
+    queries: {'qrcode_key': key},
     respHandler: (response) {
       respHeaders = response.headers;
+      return (false, null);
     },
   );
   var qrStatus = QRStatus.fromJson(data);

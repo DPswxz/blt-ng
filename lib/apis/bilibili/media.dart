@@ -20,7 +20,7 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/player/wbi/playurl',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   final List<VideoPlayInfo> videos = [];
   for (final item in data['durl']) {
@@ -40,7 +40,7 @@ Future<Video> getVideoInfo({int? avid, String? bvid}) async {
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/view',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   return Video.fromJson(data);
 }
@@ -85,7 +85,7 @@ Future<ArchiveRelation> getArchiveRelation({int? avid, String? bvid}) async {
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/archive/relation',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   return ArchiveRelation.fromJson(data);
 }

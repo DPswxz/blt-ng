@@ -40,6 +40,7 @@ class _SplashPageState extends State<SplashPage> {
     }
     final info = await getMySelfInfo();
     loginInfoNotifier.value = LoginInfo.login(
+      mid: info.mid,
       nickname: info.name,
       avatar: info.avatar,
     );
