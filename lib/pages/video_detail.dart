@@ -7,7 +7,6 @@ import 'package:bilitv/pages/video_player.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:bilitv/widgets/loading.dart';
-import 'package:bilitv/widgets/video_card.dart';
 import 'package:bilitv/widgets/video_grid_view.dart';
 import 'package:flutter/material.dart';
 

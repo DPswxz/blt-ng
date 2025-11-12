@@ -1,6 +1,8 @@
 import 'package:bilitv/apis/bilibili/rcmd.dart';
+import 'package:bilitv/apis/bilibili/toview.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
+import 'package:bilitv/storages/cookie.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/video_grid_view.dart';
 import 'dart:async';
@@ -109,6 +111,20 @@ class _RecommendPageState extends State<RecommendPage> {
             provider: _videos,
             onItemTap: _onVideoTapped,
             onItemFocus: _onVideoFocused,
+            itemMenuActions: [
+              ItemMenuAction(
+                title: '稍后再看',
+                icon: Icons.playlist_add_rounded,
+                action: (media) {
+                  if (!loginInfoNotifier.value.isLogin) return;
+
+                  addToView(avid: media.avid);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已加入稍后再看：${media.title}')),
+                  );
+                },
+              ),
+            ],
           ),
         );
       },
