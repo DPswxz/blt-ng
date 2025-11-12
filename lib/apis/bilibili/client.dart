@@ -43,11 +43,16 @@ Future<dynamic> bilibiliRequest<T>(
   Map<String, dynamic>? queries,
   (bool, dynamic) Function(Response<dynamic>)? respHandler,
   String? contentType,
+  Map<String, dynamic>? headers,
   Object? body,
 }) async {
   final response = await bilibiliHttpClient.request(
     url,
-    options: Options(method: method.toUpperCase(), contentType: contentType),
+    options: Options(
+      method: method.toUpperCase(),
+      contentType: contentType,
+      headers: headers,
+    ),
     queryParameters: queries,
     data: body,
   );

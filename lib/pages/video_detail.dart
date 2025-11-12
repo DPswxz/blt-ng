@@ -1,6 +1,5 @@
-import 'package:bilitv/apis/bilibili/error.dart';
 import 'package:bilitv/apis/bilibili/media.dart'
-    show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
+    show getVideoInfo, getArchiveRelation, ArchiveRelation;
 import 'package:bilitv/apis/bilibili/rcmd.dart' show fetchRelatedVideos;
 import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/models/video.dart';
