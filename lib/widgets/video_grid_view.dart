@@ -98,7 +98,7 @@ class VideoGridView<T> extends StatefulWidget {
 
 class _VideoGridViewState<T> extends State<VideoGridView<T>> {
   int focusIndex = 0;
-  final _keyboardListenerFocusNode = FocusNode();
+  final _keyboardListenerFocusNode = FocusNode(canRequestFocus: false);
 
   @override
   void dispose() {
