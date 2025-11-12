@@ -1,5 +1,6 @@
 import 'package:bilitv/models/pbs/dm.pb.dart';
 import 'package:bilitv/models/video.dart' show VideoPlayInfo, Video;
+import 'package:bilitv/storages/cookie.dart' show loadCookie;
 import 'package:dio/dio.dart';
 
 import 'client.dart';
@@ -20,7 +21,7 @@ Future<List<VideoPlayInfo>> getVideoPlayURL({
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/player/wbi/playurl',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   final List<VideoPlayInfo> videos = [];
   for (final item in data['durl']) {
@@ -40,7 +41,7 @@ Future<Video> getVideoInfo({int? avid, String? bvid}) async {
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/view',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   return Video.fromJson(data);
 }
@@ -85,7 +86,7 @@ Future<ArchiveRelation> getArchiveRelation({int? avid, String? bvid}) async {
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/archive/relation',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   return ArchiveRelation.fromJson(data);
 }
@@ -103,4 +104,51 @@ Future<DmSegMobileReply> getDanmaku(int cid, int segmentIndex) async {
     options: Options(responseType: ResponseType.bytes),
   );
   return DmSegMobileReply.fromBuffer(response.data);
+}
+
+// 点赞
+Future<void> likeMedia({int? avid, String? bvid, required bool like}) async {
+  final csrf = (await loadCookie())
+      .firstWhere((c) => c.name == 'bili_jct')
+      .value;
+  Map<String, dynamic> body = {'like': like ? 1 : 2, 'csrf': csrf};
+  if (avid != null) {
+    body['aid'] = avid;
+  } else {
+    body['bvid'] = bvid;
+  }
+  await bilibiliRequest(
+    'POST',
+    'https://api.bilibili.com/x/web-interface/archive/like',
+    contentType: Headers.formUrlEncodedContentType,
+    body: body,
+  );
+}
+
+// 投币
+Future<void> insertCoin({
+  int? avid,
+  String? bvid,
+  int count = 1,
+  bool selectLike = false,
+}) async {
+  final csrf = (await loadCookie())
+      .firstWhere((c) => c.name == 'bili_jct')
+      .value;
+  Map<String, dynamic> body = {
+    'multiply': count,
+    'select_like': selectLike ? 1 : 0,
+    'csrf': csrf,
+  };
+  if (avid != null) {
+    body['aid'] = avid;
+  } else {
+    body['bvid'] = bvid;
+  }
+  await bilibiliRequest(
+    'POST',
+    'https://api.bilibili.com/x/web-interface/coin/add',
+    contentType: Headers.formUrlEncodedContentType,
+    body: body,
+  );
 }

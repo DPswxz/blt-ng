@@ -1,6 +1,5 @@
-import 'package:bilitv/apis/bilibili/error.dart';
 import 'package:bilitv/apis/bilibili/media.dart'
-    show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
+    show getVideoInfo, getArchiveRelation, ArchiveRelation;
 import 'package:bilitv/apis/bilibili/rcmd.dart' show fetchRelatedVideos;
 import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/models/video.dart';
@@ -8,7 +7,6 @@ import 'package:bilitv/pages/video_player.dart';
 import 'package:bilitv/utils/format.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:bilitv/widgets/loading.dart';
-import 'package:bilitv/widgets/video_card.dart';
 import 'package:bilitv/widgets/video_grid_view.dart';
 import 'package:flutter/material.dart';
 
@@ -91,7 +89,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     );
   }
 
-  void _onVideoTapped(MediaCardInfo video) {
+  void _onVideoTapped(int _, MediaCardInfo video) {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
@@ -497,15 +495,11 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   Widget _buildRelatedVideos() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: ListView.builder(
-        addAutomaticKeepAlives: false,
-        addRepaintBoundaries: false,
+      child: VideoGridView(
+        provider: _relatedVideosProvider,
         scrollDirection: Axis.horizontal,
-        itemCount: _relatedVideosProvider.length,
-        itemBuilder: (BuildContext context, int index) => VideoCard(
-          video: _relatedVideosProvider[index],
-          onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
-        ),
+        onItemTap: _onVideoTapped,
+        crossAxisCount: 1,
       ),
     );
   }

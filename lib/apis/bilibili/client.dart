@@ -1,6 +1,7 @@
 import 'package:bilitv/apis/bilibili/error.dart';
 import 'package:bilitv/storages/cookie.dart' show loadCookie;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 final Dio bilibiliHttpClient = () {
   final client = Dio(
@@ -12,6 +13,13 @@ final Dio bilibiliHttpClient = () {
       },
     ),
   );
+
+  // 日志打印
+  if (!kReleaseMode) {
+    client.interceptors.add(
+      LogInterceptor(requestBody: true, responseBody: true, error: true),
+    );
+  }
 
   // cookie自动加载
   client.interceptors.add(
@@ -32,37 +40,34 @@ final Dio bilibiliHttpClient = () {
 Future<dynamic> bilibiliRequest<T>(
   String method,
   String url, {
-  Map<String, dynamic>? queryParameters,
-  Function(Response<dynamic>)? respHandler,
+  Map<String, dynamic>? queries,
+  (bool, dynamic) Function(Response<dynamic>)? respHandler,
+  String? contentType,
+  Map<String, dynamic>? headers,
+  Object? body,
 }) async {
-  final Response<dynamic> response;
-  switch (method.toLowerCase()) {
-    case 'get':
-      response = await bilibiliHttpClient.get(
-        url,
-        queryParameters: queryParameters,
-      );
-      break;
-    case 'post':
-      response = await bilibiliHttpClient.post(
-        url,
-        queryParameters: queryParameters,
-      );
-      break;
-    default:
-      throw Exception('unsupported method: $method');
-  }
+  final response = await bilibiliHttpClient.request(
+    url,
+    options: Options(
+      method: method.toUpperCase(),
+      contentType: contentType,
+      headers: headers,
+    ),
+    queryParameters: queries,
+    data: body,
+  );
   if (response.statusCode != 200) {
     throw Exception(
       'http error, code=${response.statusCode}, msg=${response.data}',
     );
   }
-  final data = response.data as Map<String, dynamic>;
-  if (data['code'] != 0) {
-    throw BilibiliError(data['code'], data['message']);
-  }
   if (respHandler != null) {
-    respHandler(response);
+    final (ok, respData) = respHandler(response);
+    if (ok) return respData;
   }
-  return data['data'];
+  final respData = response.data as Map<String, dynamic>;
+  if (respData['code'] != 0) {
+    throw BilibiliError(respData['code'], respData['message']);
+  }
+  return respData['data'];
 }

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
+import 'package:bilitv/apis/bilibili/history.dart';
 import 'package:bilitv/apis/bilibili/media.dart' show getVideoPlayURL;
 import 'package:bilitv/consts/bilibili.dart' show VideoQuality;
 import 'package:bilitv/consts/color.dart';
 import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/models/video.dart' as model;
 import 'package:bilitv/storages/cookie.dart';
+import 'package:bilitv/storages/settings.dart';
 import 'package:bilitv/widgets/bilibili_danmaku_wall.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -163,6 +165,7 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
 
   void _onDanmakuSwitchTapped() {
     pageState.danmakuCtl.enabled = !pageState.danmakuCtl.enabled;
+    Settings.setBool(Settings.pathDanmuSwitch, pageState.danmakuCtl.enabled);
   }
 
   void _onSelectQuality() {
@@ -388,6 +391,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void initState() {
     currentCid.addListener(_onEpisodeChanged);
     currentQuality.addListener(_onQualityChange);
+    _loadSettings();
     super.initState();
     _onEpisodeChanged();
   }
@@ -403,10 +407,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     super.dispose();
   }
 
+  void _loadSettings() {
+    Settings.getBool(Settings.pathDanmuSwitch).then((v) {
+      danmakuCtl.enabled = v;
+    });
+  }
+
   DateTime? _lastBackTime;
   void _onBack() {
     final now = DateTime.now();
     if (_lastBackTime != null && now.difference(_lastBackTime!).inSeconds < 2) {
+      // 若已登陆，上报播放进度
+      if (loginInfoNotifier.value.isLogin) {
+        reportPlayProgress(
+          widget.video.avid,
+          currentCid.value,
+          controller.player.state.position,
+        );
+      }
       return Navigator.of(context).pop();
     }
     _lastBackTime = now;
@@ -425,6 +443,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> _onEpisodeChanged() async {
+    // 上报播放开始
+    reportPlayStart(widget.video.avid, currentCid.value);
+
+    MediaPlayInfo? playInfo;
+    // 若已登陆，获取播放进度
+    if (loginInfoNotifier.value.isLogin) {
+      try {
+        playInfo = await getMediaPlayInfo(
+          avid: widget.video.avid,
+          cid: currentCid.value,
+        );
+      } catch (_) {}
+    }
+
     final infos = await getVideoPlayURL(
       avid: widget.video.avid,
       cid: currentCid.value,
@@ -434,6 +466,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       Media(
         infos.first.urls.first,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
+        start: playInfo?.lastPlayTime,
       ),
     );
   }

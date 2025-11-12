@@ -53,12 +53,16 @@ class _ToViewPageState extends State<ToViewPage> {
     _lastRefresh = now;
 
     _isLoading.value = true;
-    _videos.clear();
 
     final videos = await listToView();
 
-    _videos.addAll(videos);
+    _refreshFromData(videos);
     _isLoading.value = false;
+  }
+
+  Future<void> _refreshFromData(List<MediaCardInfo> medias) async {
+    _videos.clear();
+    _videos.addAll(medias);
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
@@ -85,7 +89,27 @@ class _ToViewPageState extends State<ToViewPage> {
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: VideoGridView(provider: _videos, onTap: _onVideoTapped),
+          child: VideoGridView(
+            provider: _videos,
+            onItemTap: _onVideoTapped,
+            itemMenuActions: [
+              ItemMenuAction(
+                title: '移除',
+                icon: Icons.playlist_remove_rounded,
+                action: (media) {
+                  if (!loginInfoNotifier.value.isLogin) return;
+
+                  deleteToView(media.avid);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('已从稍后再看中移除：${media.title}')),
+                  );
+                  final newVideos = _videos.toList();
+                  newVideos.removeWhere((video) => video.avid == media.avid);
+                  _refreshFromData(newVideos);
+                },
+              ),
+            ],
+          ),
         );
       },
     );

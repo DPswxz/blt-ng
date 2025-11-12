@@ -12,7 +12,7 @@ Future<List<MediaCardInfo>> fetchRecommendVideos({
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd',
-    queryParameters: {
+    queries: {
       'fresh_type': freshType,
       'ps': count,
       'fresh_idx': page,
@@ -45,7 +45,7 @@ Future<List<MediaCardInfo>> fetchRelatedVideos({
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/archive/related',
-    queryParameters: queryParams,
+    queries: queryParams,
   );
   final List<MediaCardInfo> videos = [];
   for (final item in data) {

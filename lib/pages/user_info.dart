@@ -28,6 +28,7 @@ class _UserInfoPageState extends State<UserInfoPage> {
     try {
       final info = await getMySelfInfo();
       loginInfoNotifier.value = LoginInfo.login(
+        mid: info.mid,
         nickname: info.name,
         avatar: info.avatar,
       );
