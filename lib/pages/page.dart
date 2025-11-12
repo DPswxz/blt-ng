@@ -1,3 +1,4 @@
+import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/pages/to_view.dart';
 import 'package:bilitv/pages/user.dart';
 import 'package:bilitv/pages/recommend.dart';
@@ -36,7 +37,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
       child: (listener) => UserEntryPage(listener),
     ),
     _PageItem(
-      icon: Icons.playlist_play_rounded,
+      icon: IconFont.playlist,
       child: (listener) => ToViewPage(listener),
     ),
     _PageItem(

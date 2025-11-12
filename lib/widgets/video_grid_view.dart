@@ -154,9 +154,8 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(item.icon, size: 28),
-                      const SizedBox(height: 6),
-                      Text(item.title, style: const TextStyle(fontSize: 12)),
+                      Icon(item.icon, size: 40),
+                      Text(item.title, style: const TextStyle(fontSize: 20)),
                     ],
                   ),
                 ),
