@@ -85,7 +85,7 @@ class _ToViewPageState extends State<ToViewPage> {
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: VideoGridView(provider: _videos, onTap: _onVideoTapped),
+          child: VideoGridView(provider: _videos, onItemTap: _onVideoTapped),
         );
       },
     );

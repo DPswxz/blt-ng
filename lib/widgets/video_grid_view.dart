@@ -67,37 +67,58 @@ class VideoGridViewProvider {
 
 class VideoGridView extends StatelessWidget {
   final VideoGridViewProvider provider;
+  final Axis scrollDirection;
   final bool shrinkWrap;
-  final void Function(int index, MediaCardInfo item)? onTap;
-  final void Function(int index, MediaCardInfo item)? onFocus;
+  final void Function(int index, MediaCardInfo item)? onItemTap;
+  final void Function(int index, MediaCardInfo item)? onItemFocus;
+  final double mainAxisSpacing;
+  final double crossAxisSpacing;
+  final int? crossAxisCount; // 与maxCrossAxisExtent互斥
+  final double? maxCrossAxisExtent; // 与crossAxisCount互斥
 
   const VideoGridView({
     super.key,
     required this.provider,
+    this.scrollDirection = Axis.vertical,
     this.shrinkWrap = false,
-    this.onTap,
-    this.onFocus,
+    this.onItemTap,
+    this.onItemFocus,
+    this.mainAxisSpacing = 20.0,
+    this.crossAxisSpacing = 20.0,
+    this.crossAxisCount,
+    this.maxCrossAxisExtent,
   });
 
   Widget itemBuilder(BuildContext context, int index, MediaCardInfo item) {
     return VideoCard(
       video: item,
-      onTap: onTap == null ? null : () => onTap!(index, item),
-      onFocus: onFocus == null ? null : () => onFocus!(index, item),
+      onTap: onItemTap == null ? null : () => onItemTap!(index, item),
+      onFocus: onItemFocus == null ? null : () => onItemFocus!(index, item),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 400,
-      childAspectRatio: videoCardAspectRatio,
-      mainAxisSpacing: 20,
-      crossAxisSpacing: 20,
-    );
+    late SliverGridDelegate gridDelegate;
+    if (crossAxisCount != null) {
+      gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount!,
+        childAspectRatio: 1 / videoCardAspectRatio,
+        mainAxisSpacing: mainAxisSpacing,
+        crossAxisSpacing: crossAxisSpacing,
+      );
+    } else {
+      gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: maxCrossAxisExtent ?? 400,
+        childAspectRatio: videoCardAspectRatio,
+        mainAxisSpacing: mainAxisSpacing,
+        crossAxisSpacing: crossAxisSpacing,
+      );
+    }
 
     if (shrinkWrap) {
       return GridView.builder(
+        scrollDirection: scrollDirection,
         shrinkWrap: shrinkWrap,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: gridDelegate,
@@ -110,6 +131,7 @@ class VideoGridView extends StatelessWidget {
     return AnimatedInfiniteScrollView<MediaCardInfo>(
       controller: provider._ctl,
       options: AnimatedInfinitePaginationOptions(
+        scrollDirection: scrollDirection,
         gridDelegate: gridDelegate,
         itemBuilder: (context, MediaCardInfo item, int index) =>
             itemBuilder(context, index, item),

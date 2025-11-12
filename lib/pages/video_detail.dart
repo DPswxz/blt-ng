@@ -90,7 +90,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     );
   }
 
-  void _onVideoTapped(MediaCardInfo video) {
+  void _onVideoTapped(int _, MediaCardInfo video) {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
@@ -496,15 +496,11 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   Widget _buildRelatedVideos() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      child: ListView.builder(
-        addAutomaticKeepAlives: false,
-        addRepaintBoundaries: false,
+      child: VideoGridView(
+        provider: _relatedVideosProvider,
         scrollDirection: Axis.horizontal,
-        itemCount: _relatedVideosProvider.length,
-        itemBuilder: (BuildContext context, int index) => VideoCard(
-          video: _relatedVideosProvider[index],
-          onTap: () => _onVideoTapped(_relatedVideosProvider[index]),
-        ),
+        onItemTap: _onVideoTapped,
+        crossAxisCount: 1,
       ),
     );
   }

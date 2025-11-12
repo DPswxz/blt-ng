@@ -65,7 +65,7 @@ class _RecommendPageState extends State<RecommendPage> {
 
   bool _isFetchingMore = false;
   DateTime? _lastFetchMore;
-  Future<void> _onVideoFocused(int index, MediaCardInfo video) async {
+  Future<void> _onVideoFocused(int index, MediaCardInfo _) async {
     final lastLine = (index / 5).floor() == ((_videos.length - 1) / 5).floor();
     if (!lastLine || _isFetchingMore) return;
 
@@ -107,8 +107,8 @@ class _RecommendPageState extends State<RecommendPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: VideoGridView(
             provider: _videos,
-            onTap: _onVideoTapped,
-            onFocus: _onVideoFocused,
+            onItemTap: _onVideoTapped,
+            onItemFocus: _onVideoFocused,
           ),
         );
       },
