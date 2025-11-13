@@ -522,34 +522,46 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                   child: child,
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(4),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'P${episode.index}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
+                      Spacer(flex: 2),
+                      Expanded(
+                        flex: 2,
+                        child: FixedLineAdaptiveText(
+                          'P${episode.index}',
+                          line: 1,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        episode.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
+                      Expanded(
+                        flex: 5,
+                        child: FixedLineAdaptiveText(
+                          episode.title,
+                          line: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        videoDurationString(episode.duration),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      Expanded(
+                        flex: 1,
+                        child: FixedLineAdaptiveText(
+                          videoDurationString(episode.duration),
+                          line: 1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
                       ),
+                      Spacer(flex: 2),
                     ],
                   ),
                 ),

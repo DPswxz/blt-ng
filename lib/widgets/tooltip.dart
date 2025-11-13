@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
 
-void pushTooltipInfo(BuildContext context, String text) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(text), duration: Duration(milliseconds: 500)),
-  );
+void pushTooltipInfo(
+  BuildContext context,
+  String text, {
+  Duration duration = const Duration(milliseconds: 500),
+}) {
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(text), duration: duration));
 }
 
-void pushTooltipWarning(BuildContext context, String text) {
+void pushTooltipWarning(
+  BuildContext context,
+  String text, {
+  Duration duration = const Duration(milliseconds: 500),
+}) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(text, style: TextStyle(color: Colors.yellow)),
-      duration: Duration(milliseconds: 500),
+      duration: duration,
     ),
   );
 }

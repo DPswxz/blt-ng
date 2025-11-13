@@ -11,6 +11,7 @@ import 'package:bilitv/models/video.dart' as model;
 import 'package:bilitv/storages/cookie.dart';
 import 'package:bilitv/storages/settings.dart';
 import 'package:bilitv/widgets/bilibili_danmaku_wall.dart';
+import 'package:bilitv/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
@@ -429,16 +430,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
     _lastBackTime = now;
 
-    toastification.show(
-      context: context,
-      closeButtonShowType: CloseButtonShowType.none,
-      style: ToastificationStyle.simple,
-      alignment: Alignment.bottomCenter,
-      backgroundColor: Colors.white10.withValues(alpha: 0.5),
-      borderSide: BorderSide(width: 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      title: Text('再按一次返回退出播放'),
-      autoCloseDuration: const Duration(seconds: 2),
+    pushTooltipInfo(
+      context,
+      '再按一次返回退出播放',
+      duration: const Duration(seconds: 2),
     );
   }
 

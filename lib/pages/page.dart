@@ -5,6 +5,7 @@ import 'package:bilitv/pages/recommend.dart';
 import 'package:bilitv/storages/cookie.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:bilitv/widgets/keep_alive.dart';
+import 'package:bilitv/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
 
 class _PageItem {
@@ -147,7 +148,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     IconButton(
-                      onPressed: () {},
+                      onPressed: () => pushTooltipWarning(context, '暂不支持该功能！'),
                       icon: Icon(Icons.settings, size: 40),
                     ),
                   ],
