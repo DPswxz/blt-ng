@@ -332,16 +332,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
             onPressed: () {
               if (!loginInfoNotifier.value.isLogin) return;
 
-              setState(() {
-                widget.relation.inPlayList = !widget.relation.inPlayList;
-              });
-              if (widget.relation.inPlayList) {
-                deleteToView(widget.video.avid);
-                pushTooltipInfo(context, '已从稍后再看中移除：${widget.video.title}');
-              } else {
-                addToView(avid: widget.video.avid);
-                pushTooltipInfo(context, '已加入稍后再看：${widget.video.title}');
-              }
+              addToView(avid: widget.video.avid);
+              pushTooltipInfo(context, '已加入稍后再看：${widget.video.title}');
             },
             child: Column(
               children: [
@@ -349,12 +341,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                   flex: 2,
                   child: FittedBox(
                     fit: BoxFit.contain,
-                    child: Icon(
-                      Icons.playlist_add_rounded,
-                      color: widget.relation.inPlayList
-                          ? Colors.pinkAccent
-                          : Colors.grey,
-                    ),
+                    child: Icon(Icons.playlist_add_rounded, color: Colors.grey),
                   ),
                 ),
                 Expanded(
