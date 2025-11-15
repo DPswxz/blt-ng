@@ -155,3 +155,16 @@ Future<(HistoryCursor, List<MediaCardInfo>)> listHistory({
   }).toList();
   return (nextCursor, videos);
 }
+
+// 删除记录
+Future<void> deleteHistory(int avid) async {
+  final csrf = (await loadCookie())
+      .firstWhere((c) => c.name == 'bili_jct')
+      .value;
+  await bilibiliRequest(
+    'POST',
+    'https://api.bilibili.com/x/v2/history/delete',
+    contentType: Headers.formUrlEncodedContentType,
+    body: {'kid': 'archive_$avid', 'csrf': csrf},
+  );
+}

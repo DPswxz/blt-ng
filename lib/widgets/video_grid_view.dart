@@ -170,9 +170,6 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
     final isLastRowOrLine =
         (index / crossAxisCount).toInt() ==
         ((max(widget.provider.length - 1, 0)) / crossAxisCount).toInt();
-    print(
-      '个数：$crossAxisCount, index: $index, length: ${widget.provider.length}, length2: ${widget.provider._ctl.items.value.length}, isLastRowOrLine：$isLastRowOrLine',
-    );
     if (!isLastRowOrLine) return;
 
     final now = DateTime.now();

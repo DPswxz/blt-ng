@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:bilitv/apis/bilibili/history.dart';
-import 'package:bilitv/apis/bilibili/toview.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/storages/cookie.dart';
@@ -29,20 +28,21 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   void initState() {
-    widget._tappedListener.addListener(_provider.refresh);
+    widget._tappedListener.addListener(_onRefresh);
     _provider.onLoad = _onLoad;
     super.initState();
   }
 
   @override
   void dispose() {
-    widget._tappedListener.removeListener(_provider.refresh);
+    widget._tappedListener.removeListener(_onRefresh);
     super.dispose();
     _provider.dispose();
   }
 
-  void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(VideoDetailPageWrap(avid: video.avid));
+  Future<void> _onRefresh() async {
+    cursor = null;
+    await _provider.refresh();
   }
 
   Future<(List<MediaCardInfo>, bool)> _onLoad({
@@ -62,6 +62,15 @@ class _HistoryPageState extends State<HistoryPage> {
     return (videos, videos.length == pageVideoCount);
   }
 
+  Future<void> _refreshFromData(List<MediaCardInfo> medias) async {
+    _provider.clear();
+    _provider.addAll(medias);
+  }
+
+  void _onVideoTapped(_, MediaCardInfo video) {
+    Get.to(VideoDetailPageWrap(avid: video.avid));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -71,13 +80,16 @@ class _HistoryPageState extends State<HistoryPage> {
         onItemTap: _onVideoTapped,
         itemMenuActions: [
           ItemMenuAction(
-            title: '稍后再看',
-            icon: Icons.playlist_add_rounded,
+            title: '历史记录',
+            icon: Icons.playlist_remove_rounded,
             action: (media) {
               if (!loginInfoNotifier.value.isLogin) return;
 
-              addToView(avid: media.avid);
-              pushTooltipInfo(context, '已加入稍后再看：${media.title}');
+              deleteHistory(media.avid);
+              pushTooltipInfo(context, '已从历史记录中移除：${media.title}');
+              final newVideos = _provider.toList();
+              newVideos.removeWhere((video) => video.avid == media.avid);
+              _refreshFromData(newVideos);
             },
           ),
         ],

@@ -29,20 +29,21 @@ class _RecommendPageState extends State<RecommendPage> {
 
   @override
   void initState() {
-    widget._tappedListener.addListener(_provider.refresh);
+    widget._tappedListener.addListener(_onRefresh);
     _provider.onLoad = _onLoad;
     super.initState();
   }
 
   @override
   void dispose() {
-    widget._tappedListener.removeListener(_provider.refresh);
+    widget._tappedListener.removeListener(_onRefresh);
     super.dispose();
     _provider.dispose();
   }
 
-  void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(VideoDetailPageWrap(avid: video.avid));
+  Future<void> _onRefresh() async {
+    page = 0;
+    await _provider.refresh();
   }
 
   Future<(List<MediaCardInfo>, bool)> _onLoad({
@@ -57,6 +58,10 @@ class _RecommendPageState extends State<RecommendPage> {
     );
 
     return (videos, true);
+  }
+
+  void _onVideoTapped(_, MediaCardInfo video) {
+    Get.to(VideoDetailPageWrap(avid: video.avid));
   }
 
   @override

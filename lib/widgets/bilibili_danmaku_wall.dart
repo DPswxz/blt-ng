@@ -15,10 +15,12 @@ class BilibiliDanmakuWallController {
   void dispose() => enableNotifier.dispose();
 
   set enabled(bool enable) => enableNotifier.value = enable;
+
   bool get enabled => enableNotifier.value;
 
   // 清空，并重新开始推送弹幕
   late final Function() _clearFunc;
+
   void clear() {
     if (_clearFunc == null) return;
     _clearFunc();
@@ -26,6 +28,7 @@ class BilibiliDanmakuWallController {
 
   // 等待一会儿再开始载入弹幕，用于步进等场景，避免频繁拉取
   late final Function(Duration duration) _waitFunc;
+
   void wait(Duration duration) {
     if (_waitFunc == null) return;
     _waitFunc(duration);
@@ -69,6 +72,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   // 时间变化
   Duration? _lastPushDanmakuTime;
+
   void _onPosition(Duration pos) {
     // 禁用时不处理
     if (!widget.controller.enabled) return;
@@ -78,7 +82,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     // 拉取弹幕
     // 已有缓存分块不属于当前时间所在分块时拉取
     final index =
-        (pos.inSeconds / danmakuChunkIntervalDuration.inSeconds).floor() + 1;
+        (pos.inSeconds / danmakuChunkIntervalDuration.inSeconds).toInt() + 1;
     final needPull =
         !_pullDanmaku && (_danmakuCache == null || index != _danmakuCache!.$1);
     if (needPull) _onPullDanmaku(index);
@@ -111,6 +115,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   // 推送弹幕
   static final _random = Random();
+
   Future<void> _onPushDanmaku(List<DanmakuElem> danmakuList) async {
     for (var e in danmakuList) {
       final y = _random.nextDouble() / 2;
@@ -150,6 +155,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   }
 
   DateTime _beginTime = DateTime.now();
+
   void _onWait(Duration duration) {
     _beginTime = DateTime.now().add(duration);
   }
