@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bilitv/apis/bilibili/rcmd.dart';
+import 'package:bilitv/apis/bilibili/recommend.dart';
 import 'package:bilitv/apis/bilibili/toview.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
@@ -68,7 +68,7 @@ class _RecommendPageState extends State<RecommendPage> {
   DateTime? _lastFetchMore;
 
   Future<void> _onVideoFocused(int index, MediaCardInfo _) async {
-    final lastLine = (index / 5).floor() == ((_videos.length - 1) / 5).floor();
+    final lastLine = (index / 5).toInt() == ((_videos.length - 1) / 5).toInt();
     if (!lastLine || _isFetchingMore) return;
 
     final now = DateTime.now();
@@ -88,7 +88,7 @@ class _RecommendPageState extends State<RecommendPage> {
   }) async {
     page++;
 
-    final videos = await fetchRecommendVideos(
+    final videos = await listRecommendVideos(
       page: page,
       count: pageVideoCount,
       removeAvids: _videos.toList().map((e) => e.avid).toList(),

@@ -1,3 +1,4 @@
+import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/storages/cookie.dart' show loadCookie, loginInfoNotifier;
 import 'package:dio/dio.dart';
 
@@ -106,4 +107,51 @@ Future<void> reportPlayHeartbeat({
     contentType: Headers.formUrlEncodedContentType,
     body: body,
   );
+}
+
+class HistoryCursor {
+  final int max;
+  final DateTime viewAt;
+  final String business;
+
+  HistoryCursor({
+    required this.max,
+    required this.viewAt,
+    required this.business,
+  });
+
+  factory HistoryCursor.fromJson(Map<String, dynamic> json) {
+    return HistoryCursor(
+      max: json['max'],
+      viewAt: DateTime.fromMillisecondsSinceEpoch(
+        json['view_at'] * Duration.millisecondsPerSecond,
+      ),
+      business: json['business'],
+    );
+  }
+}
+
+// 历史记录
+Future<(HistoryCursor, List<MediaCardInfo>)> listHistory({
+  HistoryCursor? cursor,
+  int count = 20,
+}) async {
+  Map<String, dynamic> queries = {'type': 'archive', 'ps': count};
+  if (cursor != null) {
+    queries['max'] = cursor.max;
+    queries['view_at'] =
+        (cursor.viewAt.millisecondsSinceEpoch / Duration.millisecondsPerSecond)
+            .toInt();
+    queries['business'] = cursor.business;
+  }
+  final data = await bilibiliRequest(
+    'GET',
+    'https://api.bilibili.com/x/web-interface/history/cursor',
+    queries: queries,
+  );
+  final nextCursor = HistoryCursor.fromJson(data['cursor']);
+  final videos = ((data['list'] ?? []) as List<dynamic>).map((e) {
+    return MediaCardInfo.fromHistoryJson(e);
+  }).toList();
+  return (nextCursor, videos);
 }

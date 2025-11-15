@@ -7,13 +7,13 @@ import 'package:get/get.dart';
 
 class _VideoGridViewController
     with AnimatedInfinitePaginationController<MediaCardInfo> {
-  final bool Function() onHasMore;
+  final bool Function() hasMore;
   final Future<void> Function({bool isFetchMore}) onLoad;
 
-  _VideoGridViewController({required this.onHasMore, required this.onLoad});
+  _VideoGridViewController({required this.hasMore, required this.onLoad});
 
   @override
-  get lastPage => onHasMore();
+  get lastPage => !hasMore();
 
   @override
   bool areItemsTheSame(MediaCardInfo a, MediaCardInfo b) {
@@ -26,7 +26,7 @@ class _VideoGridViewController
 
 class VideoGridViewProvider {
   late final _ctl = _VideoGridViewController(
-    onHasMore: _onHasMore,
+    hasMore: () => _hasMore,
     onLoad: fetchData,
   );
   final List<MediaCardInfo> _videos = [];
@@ -56,15 +56,13 @@ class VideoGridViewProvider {
     _ctl.refresh();
   }
 
-  bool _onHasMore() => _hasMore;
-
   Future<void> fetchData({bool isFetchMore = false}) async {
     if (onLoad == null) return;
 
     _ctl.emitState(const PaginationLoadingState());
 
     final (newVideos, hasMore) = await onLoad!(isFetchMore: isFetchMore);
-    _hasMore = !hasMore;
+    _hasMore = hasMore;
     addAll(newVideos);
   }
 }
