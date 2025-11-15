@@ -110,7 +110,6 @@ class _SelectQualityWidgetState extends State<_SelectQualityWidget> {
 
     switch (event.logicalKey) {
       case LogicalKeyboardKey.goBack:
-      case LogicalKeyboardKey.escape:
         widget.overlayEntry.remove();
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowUp:
@@ -559,7 +558,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (displayControl.value) {
       switch (value.logicalKey) {
         case LogicalKeyboardKey.goBack:
-        case LogicalKeyboardKey.escape:
           displayControl.value = false;
           break;
       }
@@ -568,15 +566,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
     switch (value.logicalKey) {
       case LogicalKeyboardKey.select:
-      case LogicalKeyboardKey.enter:
         controller.player.playOrPause();
         break;
       case LogicalKeyboardKey.contextMenu:
-      case LogicalKeyboardKey.superKey:
         displayControl.value = true;
         break;
       case LogicalKeyboardKey.goBack:
-      case LogicalKeyboardKey.escape:
         _onBack();
         break;
       case LogicalKeyboardKey.arrowLeft:

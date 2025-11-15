@@ -121,7 +121,6 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
     if (event is! KeyUpEvent) return;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.contextMenu:
-      case LogicalKeyboardKey.superKey:
         _onItemMenu(focusIndex, widget.provider[focusIndex]);
         break;
     }
