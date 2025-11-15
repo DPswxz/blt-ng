@@ -50,7 +50,6 @@ class ArchiveRelation {
   bool like;
   bool dislike;
   bool favorite;
-  bool inPlayList;
   int coin;
   bool seasonFav;
 
@@ -58,7 +57,6 @@ class ArchiveRelation {
     this.like = false,
     this.dislike = false,
     this.favorite = false,
-    this.inPlayList = false,
     this.coin = 0,
     this.seasonFav = false,
   });
@@ -68,7 +66,6 @@ class ArchiveRelation {
       like: json['like'],
       dislike: json['dislike'],
       favorite: json['favorite'],
-      inPlayList: json['attention'],
       coin: json['coin'],
       seasonFav: json['season_fav'],
     );

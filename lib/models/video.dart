@@ -30,7 +30,8 @@ class MediaCardInfo {
   final String cover;
   final Duration duration;
   final PlayProgress? progress;
-  final Stat stat;
+  final Stat? stat;
+  final int userMid;
   final String userName;
   final String userAvatar;
   final DateTime publishTime;
@@ -44,7 +45,8 @@ class MediaCardInfo {
     required this.cover,
     required this.duration,
     this.progress,
-    required this.stat,
+    this.stat,
+    required this.userMid,
     required this.userName,
     required this.userAvatar,
     required this.publishTime,
@@ -57,19 +59,42 @@ class MediaCardInfo {
           : (json['goto'] == 'live'
                 ? MediaType.live
                 : (json['goto'] == 'ogv' ? MediaType.ogv : MediaType.unknown)),
-      avid: json['aid'] ?? (json['id'] ?? 0),
-      bvid: json['bvid'] ?? '',
-      cid: json['cid'] ?? 0,
-      title: json['title'] ?? '',
-      cover: json['pic'] ?? '',
-      duration: Duration(seconds: json['duration'] ?? 0),
+      avid: json['aid'] ?? json['id'],
+      bvid: json['bvid'],
+      cid: json['cid'],
+      title: json['title'],
+      cover: json['pic'],
+      duration: Duration(seconds: json['duration']),
       progress: json['progress'] == null ? null : PlayProgress.fromJson(json),
       stat: Stat.fromJson(json['stat'] ?? {}),
-      userName: json['owner']['name'] ?? '',
-      userAvatar: json['owner']['face'] ?? '',
+      userMid: json['owner']['mid'],
+      userName: json['owner']['name'],
+      userAvatar: json['owner']['face'],
       publishTime: DateTime.fromMillisecondsSinceEpoch(
-        (json['pubdate'] ?? DateTime.timestamp()) *
-            Duration.millisecondsPerSecond,
+        json['pubdate'] * Duration.millisecondsPerSecond,
+      ),
+    );
+  }
+
+  factory MediaCardInfo.fromHistoryJson(Map<String, dynamic> json) {
+    return MediaCardInfo(
+      type: json['goto'] == 'av'
+          ? MediaType.video
+          : (json['goto'] == 'live'
+                ? MediaType.live
+                : (json['goto'] == 'ogv' ? MediaType.ogv : MediaType.unknown)),
+      avid: json['history']?['oid'],
+      bvid: json['history']?['bvid'],
+      cid: json['history']?['cid'],
+      title: json['title'],
+      cover: json['cover'],
+      duration: Duration(seconds: json['duration']),
+      progress: json['progress'] == null ? null : PlayProgress.fromJson(json),
+      userMid: json['author_mid'],
+      userName: json['author_name'],
+      userAvatar: json['author_face'],
+      publishTime: DateTime.fromMillisecondsSinceEpoch(
+        json['view_at'] * Duration.millisecondsPerSecond,
       ),
     );
   }
@@ -112,6 +137,7 @@ class Stat {
   final int dislikeCount;
   final int coinCount;
   final int shareCount;
+
   Stat({
     required this.viewCount,
     required this.favoriteCount,
@@ -120,6 +146,7 @@ class Stat {
     required this.coinCount,
     required this.shareCount,
   });
+
   factory Stat.fromJson(Map<String, dynamic> json) {
     return Stat(
       viewCount: json['view'] ?? 0,

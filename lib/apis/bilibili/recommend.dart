@@ -3,7 +3,7 @@ import 'package:bilitv/models/video.dart' show MediaCardInfo, MediaType;
 import 'client.dart';
 
 // 获取推荐视频
-Future<List<MediaCardInfo>> fetchRecommendVideos({
+Future<List<MediaCardInfo>> listRecommendVideos({
   int freshType = 4,
   int count = 30,
   int page = 1,

@@ -125,34 +125,39 @@ class VideoCard extends StatelessWidget {
                 ),
               )
             : null,
-        Positioned(
-          bottom: 8,
-          left: 8,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              color: Colors.black26.withValues(alpha: 0.1),
-            ),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Icon(
-                    Icons.play_circle_outline_sharp,
-                    size: 14,
-                    color: Colors.white,
+        ?video.stat == null
+            ? null
+            : Positioned(
+                bottom: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.black26.withValues(alpha: 0.1),
+                  ),
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.play_circle_outline_sharp,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        amountString(video.stat!.viewCount),
+                        style: TextStyle(fontSize: 12, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  amountString(video.stat.viewCount),
-                  style: TextStyle(fontSize: 12, color: Colors.white),
-                ),
-              ],
-            ),
-          ),
-        ),
+              ),
         Positioned(
           bottom: 8,
           right: 8,
