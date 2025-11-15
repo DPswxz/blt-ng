@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:animated_infinite_scroll_pagination/animated_infinite_scroll_pagination.dart';
 import 'package:bilitv/models/video.dart';
 import 'package:bilitv/widgets/video_card.dart';
@@ -22,18 +24,30 @@ class _VideoGridViewController
 
   @override
   Future<void> fetchData(int page) async => onLoad(isFetchMore: page == 1);
+
+  @override
+  void refresh() {
+    page = 1;
+    total = 0;
+    emptyList.postValue(false);
+  }
 }
 
 class VideoGridViewProvider {
   late final _ctl = _VideoGridViewController(
-    hasMore: () => _hasMore,
+    hasMore: () => hasMore,
     onLoad: fetchData,
   );
   final List<MediaCardInfo> _videos = [];
   Future<(List<MediaCardInfo>, bool)> Function({bool isFetchMore})? onLoad;
   late bool _hasMore = onLoad == null;
+  final _refreshing = ValueNotifier(false);
 
   VideoGridViewProvider({this.onLoad});
+
+  void dispose() {
+    _refreshing.dispose();
+  }
 
   List<MediaCardInfo> toList() => _videos.map((e) => e).toList();
 
@@ -45,15 +59,26 @@ class VideoGridViewProvider {
 
   bool get isNotEmpty => _videos.isNotEmpty;
 
+  bool get hasMore => _hasMore;
+
   void addAll(Iterable<MediaCardInfo> iterable) {
     _videos.addAll(iterable);
-    _ctl.emitState(PaginationSuccessState(iterable.toList(), cached: false));
+    _ctl.emitState(PaginationSuccessState(iterable.toList()));
     _ctl.setTotal(_videos.length);
   }
 
   void clear() {
     _videos.clear();
     _ctl.refresh();
+  }
+
+  Future<void> refresh() async {
+    if (_refreshing.value) return;
+
+    _refreshing.value = true;
+    clear();
+    await fetchData(isFetchMore: false);
+    _refreshing.value = false;
   }
 
   Future<void> fetchData({bool isFetchMore = false}) async {
@@ -78,6 +103,8 @@ class VideoGridView<T> extends StatefulWidget {
   final int? crossAxisCount; // 与maxCrossAxisExtent互斥
   final double? maxCrossAxisExtent; // 与crossAxisCount互斥
   final List<ItemMenuAction> itemMenuActions;
+  final Widget? refreshWidget; // 刷新时展示的组件
+  final Widget? noItemsWidget; // items为空时展示的组件
 
   const VideoGridView({
     super.key,
@@ -91,15 +118,25 @@ class VideoGridView<T> extends StatefulWidget {
     this.crossAxisCount,
     this.maxCrossAxisExtent,
     this.itemMenuActions = const [],
+    this.refreshWidget,
+    this.noItemsWidget,
   });
 
   @override
   State<VideoGridView<T>> createState() => _VideoGridViewState<T>();
 }
 
+const _defaultMaxCrossAxisExtent = 400.0;
+
 class _VideoGridViewState<T> extends State<VideoGridView<T>> {
   int focusIndex = 0;
   final _keyboardListenerFocusNode = FocusNode(canRequestFocus: false);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.provider.refresh();
+  }
 
   @override
   void dispose() {
@@ -107,14 +144,56 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
     _keyboardListenerFocusNode.dispose();
   }
 
+  bool _isFetchingMore = false;
+  DateTime? _lastRefresh;
+
+  void _onItemFocus(int index, MediaCardInfo item) {
+    focusIndex = index;
+    widget.onItemFocus?.call(index, item);
+
+    // 焦点在最后一行时拉取更多数据
+    if (!widget.provider.hasMore) return;
+    late int crossAxisCount;
+    if (widget.crossAxisCount != null) {
+      crossAxisCount = widget.crossAxisCount!;
+    } else {
+      final crossAxisSize = widget.scrollDirection == Axis.horizontal
+          ? Get.height
+          : Get.width;
+      crossAxisCount = max(
+        crossAxisSize /
+            ((widget.maxCrossAxisExtent ?? _defaultMaxCrossAxisExtent) +
+                widget.crossAxisSpacing),
+        1.0,
+      ).toInt();
+    }
+    final isLastRowOrLine =
+        (index / crossAxisCount).toInt() ==
+        ((max(widget.provider.length - 1, 0)) / crossAxisCount).toInt();
+    print(
+      '个数：$crossAxisCount, index: $index, length: ${widget.provider.length}, length2: ${widget.provider._ctl.items.value.length}, isLastRowOrLine：$isLastRowOrLine',
+    );
+    if (!isLastRowOrLine) return;
+
+    final now = DateTime.now();
+    if (_lastRefresh != null &&
+        now.difference(_lastRefresh!).inMilliseconds < 500) {
+      return;
+    }
+
+    if (_isFetchingMore) return;
+    _lastRefresh = now;
+    _isFetchingMore = true;
+    widget.provider.fetchData(isFetchMore: true).then((_) {
+      _isFetchingMore = false;
+    });
+  }
+
   Widget _itemBuilder(BuildContext context, int index, MediaCardInfo item) {
     return VideoCard(
       video: item,
       onTap: () => widget.onItemTap?.call(index, item),
-      onFocus: () {
-        focusIndex = index;
-        widget.onItemFocus?.call(index, item);
-      },
+      onFocus: () => _onItemFocus(index, item),
     );
   }
 
@@ -200,40 +279,36 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
       );
     } else {
       gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: widget.maxCrossAxisExtent ?? 400,
+        maxCrossAxisExtent:
+            widget.maxCrossAxisExtent ?? _defaultMaxCrossAxisExtent,
         childAspectRatio: videoCardAspectRatio,
         mainAxisSpacing: widget.mainAxisSpacing,
         crossAxisSpacing: widget.crossAxisSpacing,
       );
     }
 
-    late Widget gridWidget;
-    if (widget.shrinkWrap) {
-      gridWidget = GridView.builder(
-        scrollDirection: widget.scrollDirection,
-        shrinkWrap: widget.shrinkWrap,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: gridDelegate,
-        itemCount: widget.provider.length,
-        itemBuilder: (context, index) =>
-            _itemBuilder(context, index, widget.provider[index]),
-      );
-    } else {
-      gridWidget = AnimatedInfiniteScrollView<MediaCardInfo>(
-        controller: widget.provider._ctl,
-        options: AnimatedInfinitePaginationOptions(
-          scrollDirection: widget.scrollDirection,
-          gridDelegate: gridDelegate,
-          itemBuilder: (context, MediaCardInfo item, int index) =>
-              _itemBuilder(context, index, item),
-        ),
-      );
-    }
-
     return KeyboardListener(
       focusNode: _keyboardListenerFocusNode,
       onKeyEvent: _onKey,
-      child: gridWidget,
+      child: ValueListenableBuilder(
+        valueListenable: widget.provider._refreshing,
+        builder: (context, loading, child) {
+          return (loading && widget.refreshWidget != null)
+              ? widget.refreshWidget!
+              : child!;
+        },
+        child: AnimatedInfiniteScrollView<MediaCardInfo>(
+          controller: widget.provider._ctl,
+          options: AnimatedInfinitePaginationOptions(
+            scrollDirection: widget.scrollDirection,
+            gridDelegate: gridDelegate,
+            itemBuilder: (context, MediaCardInfo item, int index) =>
+                _itemBuilder(context, index, item),
+            primary: widget.shrinkWrap,
+            noItemsWidget: widget.noItemsWidget,
+          ),
+        ),
+      ),
     );
   }
 }

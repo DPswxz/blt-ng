@@ -23,29 +23,32 @@ class VideoDetailPageWrap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LoadingPage(
-      loader: () async {
-        final res = await Future.wait([
-          getVideoInfo(avid: avid, bvid: bvid),
-          getArchiveRelation(
-            avid: avid,
-            bvid: bvid,
-          ).onError((_, _) => ArchiveRelation()),
-          fetchRelatedVideos(avid: avid, bvid: bvid),
-        ]);
-        return VideoDetailPageInput(
-          res[0] as Video,
-          res[1] as ArchiveRelation,
-          res[2] as List<MediaCardInfo>,
-        );
-      },
-      builder: (context, input) {
-        return VideoDetailPage(
-          video: input.video,
-          relation: input.relation,
-          relatedVideos: input.relatedVideos,
-        );
-      },
+    return Scaffold(
+      body: LoadingWidget(
+        loader: () async {
+          final res = await Future.wait([
+            getVideoInfo(avid: avid, bvid: bvid),
+            getArchiveRelation(
+              avid: avid,
+              bvid: bvid,
+            ).onError((_, _) => ArchiveRelation()),
+            fetchRelatedVideos(avid: avid, bvid: bvid),
+          ]);
+          return VideoDetailPageInput(
+            res[0] as Video,
+            res[1] as ArchiveRelation,
+            res[2] as List<MediaCardInfo>,
+          );
+        },
+        builder: (context, input) {
+          return VideoDetailPage(
+            video: input.video,
+            relation: input.relation,
+            relatedVideos: input.relatedVideos,
+          );
+        },
+        loadingWidget: buildLoadingStyle1(),
+      ),
     );
   }
 }

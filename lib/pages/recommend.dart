@@ -11,6 +11,8 @@ import 'package:bilitv/widgets/video_grid_view.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../consts/assets.dart';
+
 class RecommendPage extends StatefulWidget {
   final ValueNotifier<int> _tappedListener;
 
@@ -22,68 +24,28 @@ class RecommendPage extends StatefulWidget {
 
 class _RecommendPageState extends State<RecommendPage> {
   int page = 0;
-  final pageVideoCount = 30;
-  final _videos = VideoGridViewProvider();
-  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
+  final pageVideoCount = 20;
+  final _provider = VideoGridViewProvider();
 
   @override
   void initState() {
-    widget._tappedListener.addListener(_onRefresh);
-    _videos.onLoad = _pullMoreVideos;
+    widget._tappedListener.addListener(_provider.refresh);
+    _provider.onLoad = _onLoad;
     super.initState();
   }
 
   @override
   void dispose() {
-    widget._tappedListener.removeListener(_onRefresh);
+    widget._tappedListener.removeListener(_provider.refresh);
     super.dispose();
-  }
-
-  DateTime? _lastRefresh;
-
-  void _onRefresh() {
-    if (_isLoading.value) return;
-
-    final now = DateTime.now();
-    if (_lastRefresh != null &&
-        now.difference(_lastRefresh!).inMilliseconds < 500) {
-      return;
-    }
-    _lastRefresh = now;
-
-    _isLoading.value = true;
-    page = 0;
-    _videos.clear();
-    _pullMoreVideos().then((res) {
-      _videos.addAll(res.$1);
-      _isLoading.value = false;
-    });
+    _provider.dispose();
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
     Get.to(VideoDetailPageWrap(avid: video.avid));
   }
 
-  bool _isFetchingMore = false;
-  DateTime? _lastFetchMore;
-
-  Future<void> _onVideoFocused(int index, MediaCardInfo _) async {
-    final lastLine = (index / 5).toInt() == ((_videos.length - 1) / 5).toInt();
-    if (!lastLine || _isFetchingMore) return;
-
-    final now = DateTime.now();
-    if (_lastFetchMore != null &&
-        now.difference(_lastFetchMore!).inMilliseconds < 500) {
-      return;
-    }
-    _lastFetchMore = now;
-
-    _isFetchingMore = true;
-    await _videos.fetchData(isFetchMore: true);
-    _isFetchingMore = false;
-  }
-
-  Future<(List<MediaCardInfo>, bool)> _pullMoreVideos({
+  Future<(List<MediaCardInfo>, bool)> _onLoad({
     bool isFetchMore = false,
   }) async {
     page++;
@@ -91,7 +53,7 @@ class _RecommendPageState extends State<RecommendPage> {
     final videos = await listRecommendVideos(
       page: page,
       count: pageVideoCount,
-      removeAvids: _videos.toList().map((e) => e.avid).toList(),
+      removeAvids: _provider.toList().map((e) => e.avid).toList(),
     );
 
     return (videos, true);
@@ -99,33 +61,29 @@ class _RecommendPageState extends State<RecommendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return LoadingWidget(
-      isLoading: _isLoading,
-      loader: () async => await _pullMoreVideos().then((res) {
-        _videos.addAll(res.$1);
-      }),
-      builder: (context, _) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: VideoGridView(
-            provider: _videos,
-            onItemTap: _onVideoTapped,
-            onItemFocus: _onVideoFocused,
-            itemMenuActions: [
-              ItemMenuAction(
-                title: '稍后再看',
-                icon: Icons.playlist_add_rounded,
-                action: (media) {
-                  if (!loginInfoNotifier.value.isLogin) return;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: VideoGridView(
+        provider: _provider,
+        onItemTap: _onVideoTapped,
+        itemMenuActions: [
+          ItemMenuAction(
+            title: '稍后再看',
+            icon: Icons.playlist_add_rounded,
+            action: (media) {
+              if (!loginInfoNotifier.value.isLogin) return;
 
-                  addToView(avid: media.avid);
-                  pushTooltipInfo(context, '已加入稍后再看：${media.title}');
-                },
-              ),
-            ],
+              addToView(avid: media.avid);
+              pushTooltipInfo(context, '已加入稍后再看：${media.title}');
+            },
           ),
-        );
-      },
+        ],
+        refreshWidget: buildLoadingStyle1(),
+        noItemsWidget: FractionallySizedBox(
+          widthFactor: 0.2,
+          child: Image.asset(Images.empty, fit: BoxFit.contain),
+        ),
+      ),
     );
   }
 }

@@ -5,7 +5,7 @@ import 'package:bilitv/consts/assets.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
 import 'package:bilitv/storages/cookie.dart';
-import 'package:bilitv/widgets/loading.dart';
+import 'package:bilitv/widgets/loading.dart' show buildLoadingStyle1;
 import 'package:bilitv/widgets/tooltip.dart';
 import 'package:bilitv/widgets/video_grid_view.dart';
 import 'package:flutter/material.dart';
@@ -21,52 +21,36 @@ class ToViewPage extends StatefulWidget {
 }
 
 class _ToViewPageState extends State<ToViewPage> {
-  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
-  final _videos = VideoGridViewProvider();
+  final _provider = VideoGridViewProvider();
 
   @override
   void initState() {
-    widget._tappedListener.addListener(_onRefresh);
+    widget._tappedListener.addListener(_provider.refresh);
+    _provider.onLoad = _onLoad;
     super.initState();
   }
 
   @override
   void dispose() {
-    widget._tappedListener.removeListener(_onRefresh);
+    widget._tappedListener.removeListener(_provider.refresh);
     super.dispose();
+    _provider.dispose();
   }
 
-  Future<void> _onInitData() async {
-    if (!loginInfoNotifier.value.isLogin) return;
-
-    final videos = await listToView();
-    _videos.addAll(videos);
-  }
-
-  DateTime? _lastRefresh;
-
-  Future<void> _onRefresh() async {
-    if (!loginInfoNotifier.value.isLogin) return;
-    if (_isLoading.value) return;
-
-    final now = DateTime.now();
-    if (_lastRefresh != null &&
-        now.difference(_lastRefresh!).inMilliseconds < 500) {
-      return;
+  Future<(List<MediaCardInfo>, bool)> _onLoad({
+    bool isFetchMore = false,
+  }) async {
+    if (!loginInfoNotifier.value.isLogin) {
+      return ([] as List<MediaCardInfo>, false);
     }
-    _lastRefresh = now;
-
-    _isLoading.value = true;
 
     final videos = await listToView();
-
-    _refreshFromData(videos);
-    _isLoading.value = false;
+    return (videos, false);
   }
 
   Future<void> _refreshFromData(List<MediaCardInfo> medias) async {
-    _videos.clear();
-    _videos.addAll(medias);
+    _provider.clear();
+    _provider.addAll(medias);
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
@@ -75,40 +59,32 @@ class _ToViewPageState extends State<ToViewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return LoadingWidget(
-      isLoading: _isLoading,
-      loader: _onInitData,
-      builder: (context, _) {
-        if (_videos.isEmpty) {
-          return FractionallySizedBox(
-            widthFactor: 0.2,
-            child: Image.asset(Images.empty, fit: BoxFit.contain),
-          );
-        }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: VideoGridView(
+        provider: _provider,
+        onItemTap: _onVideoTapped,
+        itemMenuActions: [
+          ItemMenuAction(
+            title: '移除',
+            icon: Icons.playlist_remove_rounded,
+            action: (media) {
+              if (!loginInfoNotifier.value.isLogin) return;
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: VideoGridView(
-            provider: _videos,
-            onItemTap: _onVideoTapped,
-            itemMenuActions: [
-              ItemMenuAction(
-                title: '移除',
-                icon: Icons.playlist_remove_rounded,
-                action: (media) {
-                  if (!loginInfoNotifier.value.isLogin) return;
-
-                  deleteToView(media.avid);
-                  pushTooltipInfo(context, '已从稍后再看中移除：${media.title}');
-                  final newVideos = _videos.toList();
-                  newVideos.removeWhere((video) => video.avid == media.avid);
-                  _refreshFromData(newVideos);
-                },
-              ),
-            ],
+              deleteToView(media.avid);
+              pushTooltipInfo(context, '已从稍后再看中移除：${media.title}');
+              final newVideos = _provider.toList();
+              newVideos.removeWhere((video) => video.avid == media.avid);
+              _refreshFromData(newVideos);
+            },
           ),
-        );
-      },
+        ],
+        refreshWidget: buildLoadingStyle1(),
+        noItemsWidget: FractionallySizedBox(
+          widthFactor: 0.2,
+          child: Image.asset(Images.empty, fit: BoxFit.contain),
+        ),
+      ),
     );
   }
 }
