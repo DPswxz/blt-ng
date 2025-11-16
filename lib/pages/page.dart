@@ -79,7 +79,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
     final index = _tabs.indexOf(tab);
     if (_pageController.page != index) {
       _pageController.animateToPage(
-        _tabs.indexOf(tab),
+        index,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
@@ -133,6 +133,9 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
                           children: _tabs
                               .map(
                                 (tab) => IconButton(
+                                  autofocus:
+                                      _tabs.indexOf(tab) ==
+                                      _pageController.initialPage,
                                   onPressed: () => _onTabTapped(tab),
                                   icon: ListenableBuilder(
                                     listenable: _pageController,

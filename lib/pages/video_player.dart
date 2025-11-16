@@ -566,6 +566,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             displayControl.value = false;
           });
           break;
+        case LogicalKeyboardKey.contextMenu:
+          displayControl.value = false;
+          break;
       }
       return;
     }
