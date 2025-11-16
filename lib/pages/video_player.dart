@@ -265,9 +265,9 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
                 children: [
                   StreamBuilder<Duration>(
                     stream: player.stream.position,
-                    builder: (context, snap) {
+                    builder: (context, position) {
                       return ProgressBar(
-                        progress: snap.data ?? player.state.position,
+                        progress: position.data ?? player.state.position,
                         buffered: player.state.buffer,
                         total: player.state.duration,
                         progressBarColor: lightPink,
@@ -295,9 +295,9 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
                           focusColor: Colors.grey.withValues(alpha: 0.2),
                           onPressed: _onPlayOrPauseTapped,
                           icon: Icon(
-                            playing.data == false
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
+                            playing.data ?? player.state.playing
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                             color: Colors.white,
                             size: 44,
                           ),
@@ -575,6 +575,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
     switch (value.logicalKey) {
       case LogicalKeyboardKey.select:
+      case LogicalKeyboardKey.enter:
         controller.player.playOrPause();
         break;
       case LogicalKeyboardKey.contextMenu:
