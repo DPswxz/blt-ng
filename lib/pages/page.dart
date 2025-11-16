@@ -156,7 +156,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => pushTooltipWarning(context, '暂不支持该功能！'),
+                      onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
                       icon: Icon(Icons.settings, size: 40),
                     ),
                   ],
