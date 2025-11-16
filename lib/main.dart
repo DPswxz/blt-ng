@@ -14,7 +14,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  // 设置所支持的最高刷新频率
+  // 设置所支持的最高刷新率
   await FlutterDisplayMode.setHighRefreshRate();
 
   // 开启app
