@@ -1,4 +1,5 @@
 import 'package:bilitv/icons/iconfont.dart';
+import 'package:bilitv/pages/dynamic.dart';
 import 'package:bilitv/pages/history.dart';
 import 'package:bilitv/pages/recommend.dart';
 import 'package:bilitv/pages/to_view.dart';
@@ -45,6 +46,10 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
       child: (listener) => HistoryPage(listener),
     ),
     _PageItem(
+      icon: IconFont.trends,
+      child: (listener) => DynamicPage(listener),
+    ),
+    _PageItem(
       icon: IconFont.playlist,
       child: (listener) => ToViewPage(listener),
     ),
@@ -58,7 +63,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
 
   @override
   void initState() {
-    _pageController = PageController(initialPage: 3);
+    _pageController = PageController(initialPage: 4);
     _pageFocusNodes = _tabs.map((e) => FocusNode()).toList();
     super.initState();
   }
@@ -127,7 +132,7 @@ class _PageState extends State<Page> with SingleTickerProviderStateMixin {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: Get.height / 4),
+                        padding: EdgeInsets.symmetric(vertical: Get.height / 5),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: _tabs

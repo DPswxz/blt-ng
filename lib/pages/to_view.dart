@@ -53,8 +53,10 @@ class _ToViewPageState extends State<ToViewPage> {
 
     page++;
 
-    final videos = await listToView(page: page, count: pageVideoCount);
-    return (videos, false);
+    final videos = await listToView(page: page, count: pageVideoCount + 1);
+    final hasMore = videos.length > pageVideoCount;
+    if (hasMore) videos.removeLast();
+    return (videos, hasMore);
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
