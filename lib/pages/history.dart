@@ -68,7 +68,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(VideoDetailPageWrap(avid: video.avid));
+    Get.to(VideoDetailPageWrap(avid: video.avid, cid: video.cid));
   }
 
   @override

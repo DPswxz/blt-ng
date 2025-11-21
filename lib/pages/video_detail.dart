@@ -19,8 +19,9 @@ import 'package:get/get.dart';
 class VideoDetailPageWrap extends StatelessWidget {
   final int? avid;
   final String? bvid;
+  final int? cid;
 
-  const VideoDetailPageWrap({super.key, this.avid, this.bvid});
+  const VideoDetailPageWrap({super.key, this.avid, this.bvid, this.cid});
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +45,7 @@ class VideoDetailPageWrap extends StatelessWidget {
         builder: (context, input) {
           return VideoDetailPage(
             video: input.video,
+            cid: cid,
             relation: input.relation,
             relatedVideos: input.relatedVideos,
           );
@@ -64,12 +66,14 @@ class VideoDetailPageInput {
 
 class VideoDetailPage extends StatefulWidget {
   final Video video;
+  final int? cid;
   final ArchiveRelation relation;
   final List<MediaCardInfo> relatedVideos;
 
   const VideoDetailPage({
     super.key,
     required this.video,
+    this.cid,
     required this.relation,
     this.relatedVideos = const [],
   });
@@ -79,7 +83,9 @@ class VideoDetailPage extends StatefulWidget {
 }
 
 class _VideoDetailPageState extends State<VideoDetailPage> {
-  late final _currentEpisodeCid = ValueNotifier(widget.video.cid); // 当前分P
+  late final _currentEpisodeCid = ValueNotifier(
+    widget.cid ?? widget.video.cid,
+  ); // 当前分P
   final _relatedVideosProvider = VideoGridViewProvider(); // 相关视频提供方
   late final ValueNotifier<bool> _like = ValueNotifier(
     widget.relation.like,
@@ -104,7 +110,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   }
 
   void _onVideoTapped(int _, MediaCardInfo video) {
-    Get.to(VideoDetailPageWrap(avid: video.avid));
+    Get.to(VideoDetailPageWrap(avid: video.avid, cid: video.cid));
   }
 
   @override
