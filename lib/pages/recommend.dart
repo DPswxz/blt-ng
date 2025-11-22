@@ -4,7 +4,7 @@ import 'package:bilitv/apis/bilibili/recommend.dart';
 import 'package:bilitv/apis/bilibili/toview.dart';
 import 'package:bilitv/models/video.dart' show MediaCardInfo;
 import 'package:bilitv/pages/video_detail.dart';
-import 'package:bilitv/storages/cookie.dart';
+import 'package:bilitv/storages/auth.dart';
 import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/tooltip.dart';
 import 'package:bilitv/widgets/video_grid_view.dart';
@@ -60,7 +60,7 @@ class _RecommendPageState extends State<RecommendPage> {
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(VideoDetailPageWrap(avid: video.avid));
+    Get.to(VideoDetailPageWrap(avid: video.avid, cid: video.cid));
   }
 
   @override
