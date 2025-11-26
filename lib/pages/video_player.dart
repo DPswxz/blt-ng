@@ -82,10 +82,9 @@ class _SelectQualityWidget extends StatelessWidget {
 
 // 视频控件
 class _VideoControlWidget extends StatefulWidget {
-  final VideoState state;
-  final ValueNotifier<bool> displayListener;
+  final Player player;
 
-  const _VideoControlWidget(this.state, this.displayListener);
+  const _VideoControlWidget(this.player);
 
   @override
   State<_VideoControlWidget> createState() => _VideoControlWidgetState();
@@ -94,12 +93,11 @@ class _VideoControlWidget extends StatefulWidget {
 class _VideoControlWidgetState extends State<_VideoControlWidget> {
   late _VideoPlayerPageState pageState = context
       .findAncestorStateOfType<_VideoPlayerPageState>()!;
-  late final player = widget.state.widget.controller.player;
   Timer? _nextTimer; // 播放下一个视频的计时器
 
   @override
   void initState() {
-    player.stream.completed.listen(_onCompleted);
+    widget.player.stream.completed.listen(_onCompleted);
     super.initState();
   }
 
@@ -129,7 +127,7 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
   }
 
   void _onPlayOrPauseTapped() {
-    player.playOrPause();
+    widget.player.playOrPause();
   }
 
   void _onNextTapped() {
@@ -179,129 +177,122 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: widget.displayListener,
-      builder: (context, _, child) {
-        return widget.displayListener.value ? child! : Container();
-      },
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 20, right: 20, top: 20),
-            child: Text(
-              pageState.widget.video.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 20),
+          child: Text(
+            pageState.widget.video.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
-          Container(
-            color: Colors.black.withValues(alpha: 0.5),
-            padding: EdgeInsets.only(left: 20, right: 20, bottom: 20),
-            child: FocusScope(
-              autofocus: true,
-              child: Column(
-                children: [
-                  StreamBuilder<Duration>(
-                    stream: player.stream.position,
-                    builder: (context, position) {
-                      return ProgressBar(
-                        progress: position.data ?? player.state.position,
-                        buffered: player.state.buffer,
-                        total: player.state.duration,
-                        progressBarColor: lightPink,
-                        bufferedBarColor: lightPink.withValues(alpha: 0.3),
-                        thumbColor: lightPink,
-                        timeLabelTextStyle: TextStyle(),
-                      );
-                    },
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
+        ),
+        Container(
+          color: Colors.black.withValues(alpha: 0.5),
+          padding: EdgeInsets.only(left: 20, right: 20, bottom: 20),
+          child: FocusScope(
+            autofocus: true,
+            child: Column(
+              children: [
+                StreamBuilder<Duration>(
+                  stream: widget.player.stream.position,
+                  builder: (context, position) {
+                    return ProgressBar(
+                      progress: position.data ?? widget.player.state.position,
+                      buffered: widget.player.state.buffer,
+                      total: widget.player.state.duration,
+                      progressBarColor: lightPink,
+                      bufferedBarColor: lightPink.withValues(alpha: 0.3),
+                      thumbColor: lightPink,
+                      timeLabelTextStyle: TextStyle(),
+                    );
+                  },
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      focusColor: Colors.grey.withValues(alpha: 0.2),
+                      onPressed: _onPrevTapped,
+                      icon: Icon(
+                        Icons.skip_previous_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                    StreamBuilder<bool>(
+                      stream: widget.player.stream.playing,
+                      builder: (context, playing) => IconButton(
+                        autofocus: true,
                         focusColor: Colors.grey.withValues(alpha: 0.2),
-                        onPressed: _onPrevTapped,
+                        onPressed: _onPlayOrPauseTapped,
                         icon: Icon(
-                          Icons.skip_previous_rounded,
+                          playing.data ?? widget.player.state.playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           color: Colors.white,
                           size: 44,
                         ),
                       ),
-                      StreamBuilder<bool>(
-                        stream: player.stream.playing,
-                        builder: (context, playing) => IconButton(
-                          autofocus: true,
-                          focusColor: Colors.grey.withValues(alpha: 0.2),
-                          onPressed: _onPlayOrPauseTapped,
-                          icon: Icon(
-                            playing.data ?? player.state.playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
+                    ),
+                    IconButton(
+                      focusColor: Colors.grey.withValues(alpha: 0.2),
+                      onPressed: _onNextTapped,
+                      icon: Icon(
+                        Icons.skip_next_rounded,
+                        color: Colors.white,
+                        size: 44,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      focusColor: Colors.grey.withValues(alpha: 0.2),
+                      onPressed: _onDanmakuSwitchTapped,
+                      icon: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 5.0),
+                        child: ValueListenableBuilder(
+                          valueListenable: pageState.danmakuCtl.enableNotifier,
+                          builder: (context, isEnabled, _) => Icon(
+                            isEnabled
+                                ? IconFont.danmukai
+                                : IconFont.danmuguanbi,
                             color: Colors.white,
-                            size: 44,
                           ),
                         ),
                       ),
-                      IconButton(
-                        focusColor: Colors.grey.withValues(alpha: 0.2),
-                        onPressed: _onNextTapped,
-                        icon: Icon(
-                          Icons.skip_next_rounded,
-                          color: Colors.white,
-                          size: 44,
-                        ),
-                      ),
-                      Spacer(),
-                      IconButton(
-                        focusColor: Colors.grey.withValues(alpha: 0.2),
-                        onPressed: _onDanmakuSwitchTapped,
-                        icon: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 5.0),
-                          child: ValueListenableBuilder(
-                            valueListenable:
-                                pageState.danmakuCtl.enableNotifier,
-                            builder: (context, isEnabled, _) => Icon(
-                              isEnabled
-                                  ? IconFont.danmukai
-                                  : IconFont.danmuguanbi,
+                    ),
+                    IconButton(
+                      focusColor: Colors.grey.withValues(alpha: 0.2),
+                      onPressed: _onSelectQuality,
+                      icon: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 5.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.high_quality_rounded,
                               color: Colors.white,
                             ),
-                          ),
+                            SizedBox(width: 5),
+                            Text(
+                              pageState.currentQuality.value.name,
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
                         ),
                       ),
-                      IconButton(
-                        focusColor: Colors.grey.withValues(alpha: 0.2),
-                        onPressed: _onSelectQuality,
-                        icon: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 5.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.high_quality_rounded,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 5),
-                              Text(
-                                pageState.currentQuality.value.name,
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -502,20 +493,26 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           autofocus: true,
           focusNode: screenFocusNode,
           onKeyEvent: _onKeyEvent,
-          child: ValueListenableBuilder(
-            valueListenable: currentCid,
-            builder: (context, cid, child) => BilibiliDanmakuWall(
-              controller: danmakuCtl,
-              cid: cid,
-              timeline: controller.player.stream.position,
-              playing: controller.player.stream.playing,
-              child: child!,
-            ),
-            child: Video(
-              controller: controller,
-              controls: (VideoState state) =>
-                  _VideoControlWidget(state, displayControl),
-            ),
+          child: Stack(
+            children: [
+              Video(controller: controller, controls: NoVideoControls),
+              ValueListenableBuilder(
+                valueListenable: currentCid,
+                builder: (context, cid, child) => BilibiliDanmakuWall(
+                  controller: danmakuCtl,
+                  cid: cid,
+                  timeline: controller.player.stream.position,
+                  playing: controller.player.stream.playing,
+                ),
+              ),
+              ValueListenableBuilder(
+                valueListenable: displayControl,
+                builder: (context, display, child) {
+                  return display ? child! : Container();
+                },
+                child: _VideoControlWidget(controller.player),
+              ),
+            ],
           ),
         ),
       ),

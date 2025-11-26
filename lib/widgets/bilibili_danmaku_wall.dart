@@ -38,7 +38,6 @@ class BilibiliDanmakuWallController {
 class BilibiliDanmakuWall extends StatefulWidget {
   final BilibiliDanmakuWallController controller;
   final int cid;
-  final Widget child;
   final Stream<Duration> timeline;
   final Stream<bool> playing;
 
@@ -46,7 +45,6 @@ class BilibiliDanmakuWall extends StatefulWidget {
     super.key,
     required this.controller,
     required this.cid,
-    required this.child,
     required this.timeline,
     required this.playing,
   });
@@ -161,14 +159,9 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        widget.child,
-        DanmakuScreen(
-          createdController: (c) => widget.controller._controller = c,
-          option: DanmakuOption(),
-        ),
-      ],
+    return DanmakuScreen(
+      createdController: (c) => widget.controller._controller = c,
+      option: DanmakuOption(),
     );
   }
 }
