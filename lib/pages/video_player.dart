@@ -177,27 +177,27 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(left: 20, right: 20, top: 20),
-          child: Text(
-            pageState.widget.video.title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
+    return FocusScope(
+      autofocus: true,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: 20, right: 20, top: 20),
+            child: Text(
+              pageState.widget.video.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        Container(
-          color: Colors.black.withValues(alpha: 0.5),
-          padding: EdgeInsets.only(left: 20, right: 20, bottom: 20),
-          child: FocusScope(
-            autofocus: true,
+          Container(
+            color: Colors.black.withValues(alpha: 0.5),
+            padding: EdgeInsets.only(left: 20, right: 20, bottom: 20),
             child: Column(
               children: [
                 StreamBuilder<Duration>(
@@ -291,8 +291,8 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
