@@ -162,6 +162,9 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
           pageState.widget.video.episodes[index + 1].cid;
     });
 
+    if (!mounted) {
+      return;
+    }
     toastification.show(
       context: context,
       closeButtonShowType: CloseButtonShowType.none,
@@ -415,10 +418,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     // 若已登陆，获取播放进度
     if (loginInfoNotifier.value.isLogin) {
       try {
-        playInfo = await getMediaPlayInfo(
+        final lastPlayInfo = await getMediaPlayInfo(
           avid: widget.video.avid,
           cid: currentCid.value,
         );
+        if (currentCid.value == lastPlayInfo.lastPlayCid) {
+          playInfo = lastPlayInfo;
+        }
       } catch (_) {}
     }
 
