@@ -74,13 +74,15 @@ class VideoGridViewProvider {
   }
 
   Future<void> refresh({saveInitData = true}) async {
-    if (_refreshing.value) return;
+    try {
+      if (_refreshing.value) return;
 
-    _refreshing.value = true;
-    clear();
-    if (saveInitData && initVideos.isNotEmpty) addAll(initVideos);
-    await fetchData(isFetchMore: false);
-    _refreshing.value = false;
+      _refreshing.value = true;
+      clear();
+      if (saveInitData && initVideos.isNotEmpty) addAll(initVideos);
+      await fetchData(isFetchMore: false);
+      _refreshing.value = false;
+    } catch (_) {}
   }
 
   Future<void> fetchData({bool isFetchMore = false}) async {
