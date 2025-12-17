@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:bilitv/apis/bilibili/client.dart' show bilibiliHttpClient;
 import 'package:bilitv/apis/bilibili/history.dart';
-import 'package:bilitv/apis/bilibili/media.dart' show getVideoPlayURL;
-import 'package:bilitv/consts/bilibili.dart' show VideoQuality;
+import 'package:bilitv/apis/bilibili/media.dart'
+    show getVideoPlayURL, GetVideoPlayURLResponse, SupportFormat;
 import 'package:bilitv/consts/settings.dart';
 import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/models/video.dart' as model;
@@ -29,26 +29,29 @@ class _SelectQualityWidget extends StatelessWidget {
 
   const _SelectQualityWidget(this.overlayEntry, this.pageState);
 
-  void _onSelectQuality(VideoQuality quality) {
-    pageState._currentQuality.value = quality;
+  void _onSelectQuality(SupportFormat sf) {
+    pageState._currentQuality = sf;
     overlayEntry.remove();
+    pageState._onQualityChange();
   }
 
   @override
   Widget build(BuildContext context) {
-    late VideoQuality focusQuality;
-    if (pageState._allowQualities.contains(pageState._currentQuality.value)) {
-      focusQuality = pageState._currentQuality.value;
+    late int focusQuality;
+    if (pageState._videoPlayURLInfo.supportFormats.any(
+      (e) => e.quality == pageState._currentQuality.quality,
+    )) {
+      focusQuality = pageState._currentQuality.quality;
     } else {
-      focusQuality = pageState._allowQualities.first;
+      focusQuality = pageState._videoPlayURLInfo.supportFormats.last.quality;
     }
-    final selects = pageState._allowQualities
+    final selects = pageState._videoPlayURLInfo.supportFormats
         .map(
           (e) => Container(
             padding: EdgeInsets.symmetric(vertical: 4),
             width: 320,
             child: ElevatedButton(
-              autofocus: e == focusQuality,
+              autofocus: e.quality == focusQuality,
               onPressed: () => _onSelectQuality(e),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white10,
@@ -57,7 +60,7 @@ class _SelectQualityWidget extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 14),
                 textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
-              child: Text(e.name),
+              child: Text(e.description),
             ),
           ),
         )
@@ -295,7 +298,7 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
                             ),
                             SizedBox(width: 5),
                             Text(
-                              _pageState._currentQuality.value.name,
+                              _pageState._currentQuality.description,
                               style: TextStyle(color: Colors.white),
                             ),
                           ],
@@ -339,10 +342,8 @@ class VideoPlayerPage extends StatefulWidget {
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late final ValueNotifier<int> _currentCid;
-  final _allowQualities = VideoQuality.values
-      .where((e) => !e.needLogin || loginInfoNotifier.value.isLogin)
-      .toList();
-  late final ValueNotifier<VideoQuality> _currentQuality;
+  late GetVideoPlayURLResponse _videoPlayURLInfo;
+  late SupportFormat _currentQuality;
 
   late final VideoController _controller;
   late final BilibiliDanmakuWallController _danmakuCtl;
@@ -357,8 +358,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     super.initState();
     _currentCid = ValueNotifier(widget.cid);
     _currentCid.addListener(_onEpisodeChanged);
-    _currentQuality = ValueNotifier(VideoQuality.vq1080P);
-    _currentQuality.addListener(_onQualityChange);
     _controller = VideoController(
       Player(),
       configuration: VideoControllerConfiguration(
@@ -383,7 +382,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _screenFocusNode.dispose();
     _danmakuCtl.dispose();
     _controller.player.dispose();
-    _currentQuality.dispose();
     _currentCid.dispose();
     super.dispose();
   }
@@ -447,14 +445,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       } catch (_) {}
     }
 
-    final infos = await getVideoPlayURL(
+    _videoPlayURLInfo = await getVideoPlayURL(
       avid: widget.video.avid,
       cid: _currentCid.value,
-      quality: _currentQuality.value.index,
     );
+    _currentQuality = _videoPlayURLInfo.supportFormats.firstWhere(
+      (e) => e.quality == _videoPlayURLInfo.defaultQuality,
+    );
+    final audioUrl = _videoPlayURLInfo.dashData.audio.first.baseUrl.replaceAll(
+      ':',
+      '\\:',
+    );
+    final platformPlayer = _controller.player.platform! as NativePlayer;
+    platformPlayer.setProperty("audio-files", audioUrl);
+    final videoUrl = _videoPlayURLInfo.dashData.video
+        .firstWhere((e) => e.quality == _currentQuality.quality)
+        .baseUrl;
     await _controller.player.open(
       Media(
-        infos.first.urls.first,
+        videoUrl,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
         start: playInfo?.lastPlayTime,
       ),
@@ -480,14 +489,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final danmakuEnabled = _danmakuCtl.enabled;
     _danmakuCtl.enabled = false;
 
-    final infos = await getVideoPlayURL(
-      avid: widget.video.avid,
-      cid: _currentCid.value,
-      quality: _currentQuality.value.index,
+    final audioUrl = _videoPlayURLInfo.dashData.audio.first.baseUrl.replaceAll(
+      ':',
+      '\\:',
     );
+    final platformPlayer = _controller.player.platform! as NativePlayer;
+    platformPlayer.setProperty("audio-files", audioUrl);
+    final videoUrl = _videoPlayURLInfo.dashData.video
+        .firstWhere((e) => e.quality == _currentQuality.quality)
+        .baseUrl;
     await _controller.player.open(
       Media(
-        infos.first.urls.first,
+        videoUrl,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
         start: _controller.player.state.position,
       ),
