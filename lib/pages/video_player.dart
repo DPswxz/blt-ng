@@ -12,6 +12,7 @@ import 'package:bilitv/storages/settings.dart';
 import 'package:bilitv/widgets/bilibili_danmaku_wall.dart';
 import 'package:bilitv/widgets/focus_dropdown_button.dart';
 import 'package:bilitv/widgets/focus_progress_bar.dart';
+import 'package:bilitv/widgets/loading.dart';
 import 'package:bilitv/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -412,21 +413,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> _playDashMedia(DashData media, {Duration? start}) async {
-    final audioUrl = _videoPlayURLInfo.dashData.audio.first.baseUrl.replaceAll(
-      ':',
-      '\\:',
-    );
-    final platformPlayer = _controller.player.platform! as NativePlayer;
-    platformPlayer.setProperty("audio-files", audioUrl);
-    final videoUrl = _videoPlayURLInfo.dashData.video
-        .firstWhere((e) => e.quality == _currentQuality.quality)
-        .baseUrl;
     await _controller.player.open(
       Media(
-        videoUrl,
+        _videoPlayURLInfo.dashData.video
+            .firstWhere((e) => e.quality == _currentQuality.quality)
+            .baseUrl,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
         start: start,
       ),
+    );
+    await _controller.player.setAudioTrack(
+      AudioTrack.uri(_videoPlayURLInfo.dashData.audio.first.baseUrl),
     );
   }
 
@@ -454,6 +451,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           child: Stack(
             children: [
               Video(controller: _controller, controls: NoVideoControls),
+              StreamBuilder<bool>(
+                stream: _controller.player.stream.buffering,
+                builder: (context, buffering) => (buffering.data ?? false)
+                    ? buildLoadingStyle3()
+                    : SizedBox(),
+              ),
               ValueListenableBuilder(
                 valueListenable: _currentCid,
                 builder: (context, cid, child) => BilibiliDanmakuWall(
