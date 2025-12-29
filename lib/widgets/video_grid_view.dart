@@ -64,6 +64,8 @@ class VideoGridViewProvider {
 
   bool get isNotEmpty => _videos.isNotEmpty;
 
+  set hasMore(v) => _hasMore = v;
+
   bool get hasMore => _hasMore;
 
   void addAll(Iterable<MediaCardInfo> iterable) {

@@ -142,6 +142,29 @@ class MediaCardInfo {
       ),
     );
   }
+
+  factory MediaCardInfo.fromSearchJson(Map<String, dynamic> json) {
+    String title = json['title'];
+    RegExp exp = RegExp(r'<em class=".*?">(.+?)</em>');
+    title = title.replaceAllMapped(exp, (match) => '${match[1]}');
+    return MediaCardInfo(
+      type: json['type'] == 'video' ? MediaType.video : MediaType.unknown,
+      avid: json['aid'],
+      bvid: json['bvid'],
+      cid: json['id'],
+      title: title,
+      cover: (json['pic'] as String).startsWith('https:')
+          ? json['pic']
+          : 'https:${json['pic']}',
+      duration: fromVideoDurationString(json['duration']),
+      userMid: json['mid'],
+      userName: json['author'],
+      userAvatar: json['upic'],
+      publishTime: DateTime.fromMillisecondsSinceEpoch(
+        json['pubdate'] * Duration.millisecondsPerSecond,
+      ),
+    );
+  }
 }
 
 // 统计信息

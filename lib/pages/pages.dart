@@ -2,6 +2,7 @@ import 'package:bilitv/icons/iconfont.dart';
 import 'package:bilitv/pages/dynamic.dart';
 import 'package:bilitv/pages/history.dart';
 import 'package:bilitv/pages/recommend.dart';
+import 'package:bilitv/pages/search.dart';
 import 'package:bilitv/pages/setting.dart';
 import 'package:bilitv/pages/to_view.dart';
 import 'package:bilitv/pages/user.dart';
@@ -50,6 +51,10 @@ class _PageState extends State<Page> {
       _PageItem(
         icon: Icons.account_circle_rounded,
         child: (listener) => UserEntryPage(listener),
+      ),
+      _PageItem(
+        icon: Icons.search_rounded,
+        child: (listener) => SearchPage(listener),
       ),
       _PageItem(
         icon: Icons.history_rounded,
@@ -125,7 +130,7 @@ class _PageState extends State<Page> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: Get.height / 5),
+                    padding: EdgeInsets.symmetric(vertical: Get.height / 6),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: _tabs
