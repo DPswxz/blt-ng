@@ -10,6 +10,9 @@ String videoDurationString(Duration duration) {
 
 // 视频时长格式化
 Duration fromVideoDurationString(String duration) {
+  if (duration.isEmpty) {
+    return Duration();
+  }
   final res = duration.split(':');
   final m = int.parse(res[0]);
   final s = int.parse(res[1]);
