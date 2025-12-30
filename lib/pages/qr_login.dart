@@ -1,15 +1,14 @@
 import 'dart:async';
 
 import 'package:bilitv/apis/bilibili/auth.dart';
+import 'package:bilitv/apis/bilibili/user.dart';
 import 'package:bilitv/storages/auth.dart'
-    show saveCookie;
+    show saveCookie, loginInfoNotifier, LoginInfo;
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class QRLoginPage extends StatefulWidget {
-  final ValueNotifier<bool> loginNotifier;
-
-  const QRLoginPage(this.loginNotifier, {super.key});
+  const QRLoginPage({super.key});
 
   @override
   State<QRLoginPage> createState() => _QRLoginPageState();
@@ -97,17 +96,12 @@ class _QRLoginPageState extends State<QRLoginPage> {
 
     try {
       await saveCookie(status.cookies, refreshToken: status.refreshToken ?? '');
-
-      // final info = await getMySelfInfo();
-      // if (!mounted) return;
-      //
-      // loginInfoNotifier.value = LoginInfo.login(
-      //   mid: info.mid,
-      //   nickname: info.name,
-      //   avatar: info.avatar,
-      // );
-
-      widget.loginNotifier.value = true;
+      final info = await getMySelfInfo();
+      loginInfoNotifier.value = LoginInfo.login(
+        mid: info.mid,
+        nickname: info.name,
+        avatar: info.avatar,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {

@@ -5,16 +5,9 @@ import 'package:bilitv/storages/auth.dart'
 import 'package:bilitv/widgets/bilibili_image.dart';
 import 'package:flutter/material.dart';
 
-class UserInfoPage extends StatefulWidget {
-  final ValueNotifier<bool> loginNotifier;
+class UserInfoPage extends StatelessWidget {
+  const UserInfoPage({super.key});
 
-  const UserInfoPage(this.loginNotifier, {super.key});
-
-  @override
-  State<UserInfoPage> createState() => _UserInfoPageState();
-}
-
-class _UserInfoPageState extends State<UserInfoPage> {
   Future<MySelf?> _load() async {
     try {
       final info = await getMySelfInfo();
@@ -33,7 +26,6 @@ class _UserInfoPageState extends State<UserInfoPage> {
   Future<void> _logout() async {
     await clearCookie();
     loginInfoNotifier.value = LoginInfo.notLogin;
-    widget.loginNotifier.value = false;
   }
 
   @override

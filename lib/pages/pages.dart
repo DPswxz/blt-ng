@@ -8,6 +8,7 @@ import 'package:bilitv/pages/to_view.dart';
 import 'package:bilitv/pages/user.dart';
 import 'package:bilitv/storages/auth.dart';
 import 'package:bilitv/widgets/bilibili_image.dart';
+import 'package:bilitv/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_lazy_indexed_stack/flutter_lazy_indexed_stack.dart';
 import 'package:get/get.dart';
@@ -96,6 +97,15 @@ class _PageState extends State<Page> {
     }
   }
 
+  DateTime _lastTapAvatarTime = DateTime.now();
+
+  Future<void> _onLongPressAvatar() async {
+    if (!loginInfoNotifier.value.isLogin) return;
+    loginInfoNotifier.value = LoginInfo.notLogin;
+    pushTooltipInfo(context, "已退出当前账号！");
+    await clearCookie();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,14 +126,32 @@ class _PageState extends State<Page> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                ListenableBuilder(
-                  listenable: loginInfoNotifier,
-                  builder: (context, child) {
-                    return BilibiliAvatar(
-                      loginInfoNotifier.value.avatar,
-                      radius: 30,
-                    );
+                IconButton(
+                  onPressed: () {
+                    if (!loginInfoNotifier.value.isLogin) return;
+
+                    final now = DateTime.now();
+                    final diff = now.difference(_lastTapAvatarTime);
+                    if (diff < Duration(milliseconds: 600)) {
+                      _onLongPressAvatar();
+                    } else {
+                      pushTooltipInfo(context, "长按退出当前账号");
+                    }
+                    _lastTapAvatarTime = now;
                   },
+                  onLongPress: () {
+                    if (!loginInfoNotifier.value.isLogin) return;
+                    _onLongPressAvatar();
+                  },
+                  icon: ListenableBuilder(
+                    listenable: loginInfoNotifier,
+                    builder: (context, child) {
+                      return BilibiliAvatar(
+                        loginInfoNotifier.value.avatar,
+                        radius: 30,
+                      );
+                    },
+                  ),
                 ),
                 Expanded(
                   child: Padding(
