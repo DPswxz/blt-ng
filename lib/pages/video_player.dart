@@ -23,7 +23,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:toastification/toastification.dart';
 
 const _step = Duration(seconds: 5);
-const _danmakuWaitDuration = Duration(seconds: 10);
+const _danmakuWaitDuration = Duration(seconds: 5);
 
 // 视频控件
 class _VideoControlWidget extends StatefulWidget {
@@ -129,6 +129,12 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
     );
   }
 
+  void onPositionChanged(Duration pos) {
+    widget.player.seek(pos);
+    _pageState._danmakuCtl.wait(_danmakuWaitDuration);
+    _pageState._danmakuCtl.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     return FocusScope(
@@ -154,7 +160,11 @@ class _VideoControlWidgetState extends State<_VideoControlWidget> {
             padding: EdgeInsets.only(left: 20, right: 20, bottom: 20),
             child: Column(
               children: [
-                FocusProgressBar(widget.player),
+                FocusProgressBar(
+                  stream: widget.player.stream,
+                  state: widget.player.state,
+                  onPositionChanged: onPositionChanged,
+                ),
                 Row(
                   children: [
                     IconButton(
@@ -316,6 +326,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _onPlayError(String err) {
+    if (_audioUrls.isNotEmpty && err.contains(_audioUrls.first)) {
+      if (!err.contains('Can not open external file')) {
+        return;
+      }
+      _audioUrls.removeAt(0);
+      if (_audioUrls.isEmpty) {
+        pushTooltipError(context, "音频加载失败");
+      } else {
+        _controller.player.setAudioTrack(AudioTrack.uri(_audioUrls.first));
+      }
+      return;
+    }
     pushTooltipError(context, err);
   }
 
@@ -438,19 +460,36 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _danmakuCtl.enabled = danmakuEnabled;
   }
 
+  var _videoUrls = [];
+  var _audioUrls = [];
+
   Future<void> _playDashMedia(DashData media, {Duration? start}) async {
-    await _controller.player.open(
-      Media(
-        _videoPlayURLInfo.dashData.video
-            .firstWhere((e) => e.quality == _currentQuality.id)
-            .baseUrl,
-        httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
-        start: start,
+    var video = _videoPlayURLInfo.dashData.video.firstWhere(
+      (e) => e.quality == _currentQuality.id,
+    );
+    var videoUrls = [video.baseUrl];
+    videoUrls.addAll(video.backupUrls);
+    var audioUrls = _videoPlayURLInfo.dashData.audio.mapMany((e) {
+      var urls = [e.baseUrl];
+      urls.addAll(e.backupUrls);
+      return urls;
+    }).toList();
+
+    _videoUrls.clear();
+    _audioUrls.clear();
+    Future.wait([
+      _controller.player.open(
+        Media(
+          videoUrls.first,
+          httpHeaders: bilibiliHttpClient.options.headers
+              .cast<String, String>(),
+          start: start,
+        ),
       ),
-    );
-    await _controller.player.setAudioTrack(
-      AudioTrack.uri(_videoPlayURLInfo.dashData.audio.first.baseUrl),
-    );
+      _controller.player.setAudioTrack(AudioTrack.uri(audioUrls.first)),
+    ]).ignore();
+    _videoUrls = videoUrls;
+    _audioUrls = audioUrls;
   }
 
   void _onPlayCompleted() {
