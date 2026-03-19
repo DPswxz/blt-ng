@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:bilitv/apis/bilibili/media.dart';
@@ -58,14 +59,27 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   bool _pullDanmaku = false;
   (int, DmSegMobileReply)? _danmakuCache;
 
+  StreamSubscription<Duration>? _timelineSubscription;
+  StreamSubscription<bool>? _playingSubscription;
+
   @override
   void initState() {
     super.initState();
-    widget.timeline.listen(_onPosition);
-    widget.playing.listen(_onPlayingChanged);
+    _timelineSubscription = widget.timeline.listen(_onPosition);
+    _playingSubscription = widget.playing.listen(_onPlayingChanged);
     widget.controller.enableNotifier.addListener(_onEnableChanged);
     widget.controller._clearFunc = _onClear;
     widget.controller._waitFunc = _onWait;
+  }
+
+  @override
+  void dispose() {
+    _timelineSubscription?.cancel();
+    _playingSubscription?.cancel();
+    widget.controller.enableNotifier.removeListener(_onEnableChanged);
+    widget.controller._clearFunc = () {};
+    widget.controller._waitFunc = (_) {};
+    super.dispose();
   }
 
   // 时间变化
