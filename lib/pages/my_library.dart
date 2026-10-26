@@ -15,6 +15,58 @@ import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+Future<void> playLibraryEpisode(
+  BuildContext context,
+  LibraryEntry season,
+  LibraryEntry episode,
+) async {
+  try {
+    if ((episode.aid ?? 0) <= 0 || (episode.cid ?? 0) <= 0) {
+      throw StateError('该分集暂时无法播放');
+    }
+    final danmu = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
+    final decoder =
+        await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
+    if (!context.mounted) return;
+    final video = Video(
+      avid: episode.aid!,
+      bvid: '',
+      title: '${season.title} · ${episode.title}',
+      cover: episode.cover,
+      desc: '',
+      duration: Duration.zero,
+      stat: Stat.fromJson({}),
+      userMid: 0,
+      userName: '哔哩哔哩番剧',
+      userAvatar: '',
+      publishTime: DateTime.fromMillisecondsSinceEpoch(0),
+      cid: episode.cid!,
+      episodes: [
+        Episode(
+          index: 1,
+          cid: episode.cid!,
+          episodeId: episode.id,
+          title: episode.title,
+          duration: Duration.zero,
+        ),
+      ],
+    );
+    Get.to(
+      () => VideoPlayerPage(
+        video: video,
+        cid: episode.cid!,
+        danmu: danmu,
+        ha: true,
+        vo: VideoOutputDrivers.gpu,
+        hwdec: HardwareVideoDecoder.autoSafe,
+        decoderMode: decoder,
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) showAppError(context, e);
+  }
+}
+
 typedef LibraryLoader = Future<LibraryBatch> Function(int page);
 
 class MySubscriptions extends StatefulWidget {
@@ -27,54 +79,8 @@ class MySubscriptions extends StatefulWidget {
 class _MySubscriptionsState extends State<MySubscriptions> {
   int _type = 1;
   LibraryEntry? _season;
-  Future<void> _play(LibraryEntry episode) async {
-    try {
-      if ((episode.aid ?? 0) <= 0 || (episode.cid ?? 0) <= 0) {
-        throw StateError('该分集暂时无法播放');
-      }
-      final season = _season!;
-      final danmu = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
-      final decoder =
-          await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
-      if (!mounted) return;
-      final video = Video(
-        avid: episode.aid!,
-        bvid: '',
-        title: '${season.title} · ${episode.title}',
-        cover: episode.cover,
-        desc: '',
-        duration: Duration.zero,
-        stat: Stat.fromJson({}),
-        userMid: 0,
-        userName: '哔哩哔哩番剧',
-        userAvatar: '',
-        publishTime: DateTime.fromMillisecondsSinceEpoch(0),
-        cid: episode.cid!,
-        episodes: [
-          Episode(
-            index: 1,
-            cid: episode.cid!,
-            episodeId: episode.id,
-            title: episode.title,
-            duration: Duration.zero,
-          ),
-        ],
-      );
-      Get.to(
-        () => VideoPlayerPage(
-          video: video,
-          cid: episode.cid!,
-          danmu: danmu,
-          ha: true,
-          vo: VideoOutputDrivers.gpu,
-          hwdec: HardwareVideoDecoder.autoSafe,
-          decoderMode: decoder,
-        ),
-      );
-    } catch (e) {
-      if (mounted) showAppError(context, e);
-    }
-  }
+  Future<void> _play(LibraryEntry episode) =>
+      playLibraryEpisode(context, _season!, episode);
 
   @override
   Widget build(BuildContext context) {
@@ -467,6 +473,29 @@ class _LibraryCard extends StatelessWidget {
                             ),
                           )
                         : BilibiliNetworkImage(item.cover),
+                    if (item.badge.isNotEmpty)
+                      Positioned(
+                        top: 10 * ui,
+                        right: 10 * ui,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10 * ui,
+                            vertical: 4 * ui,
+                          ),
+                          decoration: BoxDecoration(
+                            color: navigationAccentColor,
+                            borderRadius: BorderRadius.circular(8 * ui),
+                          ),
+                          child: Text(
+                            item.badge,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18 * ui,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
                     if (item.subtitle.isNotEmpty)
                       Positioned(
                         left: 10 * ui,

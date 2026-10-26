@@ -8,6 +8,7 @@ import 'package:blt/utils/json.dart';
 class LibraryEntry {
   final int id;
   final String title, cover, subtitle;
+  final String badge;
   final MediaCardInfo? video;
   final int? aid, cid;
   const LibraryEntry({
@@ -15,6 +16,7 @@ class LibraryEntry {
     required this.title,
     this.cover = '',
     this.subtitle = '',
+    this.badge = '',
     this.video,
     this.aid,
     this.cid,
@@ -25,6 +27,56 @@ class LibraryBatch {
   final List<LibraryEntry> items;
   final bool hasMore;
   const LibraryBatch(this.items, {this.hasMore = false});
+}
+
+String seasonAccessBadge(Map<String, dynamic> data) {
+  final text = jsonString(
+    jsonMap(data['badge_info'])?['text'],
+    fallback: jsonString(data['badge']),
+  );
+  if (text.contains('限免') || text.contains('免费') || text.contains('付费')) {
+    return text;
+  }
+  if (text.contains('会员') || jsonInt(data['season_status']) == 13) {
+    return '大会员';
+  }
+  return text;
+}
+
+Future<LibraryBatch> listBangumiCatalog({int page = 1}) async {
+  final data =
+      jsonMap(
+        await bilibiliRequest(
+          'GET',
+          'https://api.bilibili.com/pgc/season/index/result',
+          queries: {
+            'season_type': 1,
+            'type': 1,
+            'page': page,
+            'pagesize': 20,
+            'order': 3,
+            'sort': 0,
+          },
+        ),
+      ) ??
+      {};
+  return LibraryBatch([
+    for (final raw in jsonList(data['list']) ?? [])
+      if (jsonInt(jsonMap(raw)?['season_id']) > 0)
+        LibraryEntry(
+          id: jsonInt(jsonMap(raw)?['season_id']),
+          title: jsonString(jsonMap(raw)?['title']),
+          cover: jsonString(
+            jsonMap(raw)?['horizontal_cover'],
+            fallback: jsonString(
+              jsonMap(jsonMap(raw)?['first_ep'])?['cover'],
+              fallback: jsonString(jsonMap(raw)?['cover']),
+            ),
+          ),
+          subtitle: jsonString(jsonMap(raw)?['index_show']),
+          badge: seasonAccessBadge(jsonMap(raw) ?? {}),
+        ),
+  ], hasMore: jsonBool(data['has_next']));
 }
 
 Future<LibraryBatch> listFollowedSeasons(
@@ -47,6 +99,7 @@ Future<LibraryBatch> listFollowedSeasons(
       LibraryEntry(
         id: id,
         title: jsonString(d['title']),
+        badge: seasonAccessBadge(d),
         cover: jsonString(
           d['horizontal_cover'],
           fallback: jsonString(d['cover']),
@@ -187,6 +240,7 @@ Future<LibraryBatch> listSeasonEpisodes(int season) async {
             .trim(),
         cover: jsonString(d['cover'], fallback: jsonString(data['cover'])),
         subtitle: jsonString(d['badge']),
+        badge: seasonAccessBadge(d),
         aid: jsonInt(d['aid']),
         cid: jsonInt(d['cid']),
       ),

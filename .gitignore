@@ -62,3 +62,10 @@ android/.kotlin/
 
 # Local diagnostics
 gradle-*-threads.txt
+
+# Private local device diagnostics and release staging
+/docs/TCL-65P11.md
+/local-diagnostics/
+*.apk
+*.apks
+*.xapk

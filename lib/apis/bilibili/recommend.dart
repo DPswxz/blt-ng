@@ -56,3 +56,23 @@ Future<List<MediaCardInfo>> fetchRelatedVideos({
   }
   return videos;
 }
+
+Future<(List<MediaCardInfo>, bool)> listPopularVideos({
+  int page = 1,
+  int count = 20,
+}) async {
+  final data =
+      jsonMap(
+        await bilibiliRequest(
+          'GET',
+          'https://api.bilibili.com/x/web-interface/popular',
+          queries: {'pn': page, 'ps': count},
+        ),
+      ) ??
+      {};
+  final videos = (jsonList(data['list']) ?? [])
+      .map((raw) => MediaCardInfo.fromJson({...?jsonMap(raw), 'goto': 'av'}))
+      .whereType<MediaCardInfo>()
+      .toList();
+  return (videos, !jsonBool(data['no_more']) && videos.isNotEmpty);
+}
