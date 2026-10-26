@@ -176,6 +176,12 @@ void main() {
   });
 
   group('Video.fromJson', () {
+    test('简介保留原文，旧字段空时从富文本简介回退', () {
+      expect(Video.descriptionFromJson({'desc':'原文','desc_v2':[{'type':1,'raw_text':'备用'}]}),'原文');
+      expect(Video.descriptionFromJson({'desc':'  ','desc_v2':[{'type':1,'raw_text':'第一段\n'},{'type':2,'raw_text':'作者'},{'type':1,'raw_text':'第二段'}]}),'第一段\n@作者 第二段');
+      expect(Video.descriptionFromJson({'desc':null,'desc_v2':[null,3,{}]}),'');
+    });
+
     test('核心字段（aid/标题）缺失时返回 null', () {
       expect(Video.fromJson({'title': 'x'}), isNull);
       expect(Video.fromJson({'aid': 1}), isNull);

@@ -50,3 +50,15 @@ app.*.map.json
 # AI
 .codegraph
 ui
+android/tcl-debug.keystore
+work-*.py
+*.log
+
+android/build/
+gradle-threads.txt
+
+work/
+android/.kotlin/
+
+# Local diagnostics
+gradle-*-threads.txt

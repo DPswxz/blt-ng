@@ -14,8 +14,9 @@ import 'package:blt/widgets/bilibili_image.dart';
 import 'package:blt/widgets/sidebar.dart';
 import 'package:blt/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:blt/widgets/pink_style.dart';
 import 'package:flutter_lazy_indexed_stack/flutter_lazy_indexed_stack.dart';
-import 'package:get/get.dart';
 
 class _PageItem {
   final IconData icon;
@@ -50,6 +51,8 @@ class Page extends StatefulWidget {
 }
 
 class _PageState extends State<Page> {
+  bool _exitDialogOpen = false;
+  final _searchKey = GlobalKey<SearchPageState>();
   late final List<_PageItem> _tabs;
   late ValueNotifier<int> _currentPageIndex;
   late List<FocusNode> _pageFocusNodes;
@@ -67,7 +70,8 @@ class _PageState extends State<Page> {
       _PageItem(
         icon: IconFont.search,
         label: '搜索',
-        child: (listener) => SearchPage(tappedListener: listener),
+        child: (listener) =>
+            SearchPage(key: _searchKey, tappedListener: listener),
       ),
       _PageItem(
         icon: IconFont.history,
@@ -92,6 +96,11 @@ class _PageState extends State<Page> {
         label: '首页',
         child: (listener) => RecommendPage(listener),
         homePage: true,
+      ),
+      _PageItem(
+        icon: Icons.settings_rounded,
+        label: '设置',
+        child: (listener) => SettingPage(refreshListener: listener),
       ),
     ];
     _pageFocusNodes = _tabs.map((e) => FocusNode()).toList();
@@ -123,6 +132,7 @@ class _PageState extends State<Page> {
 
     final index = _tabs.indexOf(tab);
     if (_currentPageIndex.value != index) {
+      if (tab.child is SettingPage) tab.onTappedListener.value++;
       _currentPageIndex.value = index;
     } else {
       tab.onTappedListener.value = DateTime.now().microsecondsSinceEpoch;
@@ -160,64 +170,124 @@ class _PageState extends State<Page> {
     pushTooltipInfo(context, "已退出当前账号！");
   }
 
+  Future<void> _handleBack() async {
+    if (_exitDialogOpen) return;
+    final home = _tabs.lastIndexWhere((tab) => tab.homePage);
+    if (_currentPageIndex.value == 1 &&
+        (_searchKey.currentState?.dismissInput() ?? false)) {
+      return;
+    }
+    if (_currentPageIndex.value != home) {
+      _currentPageIndex.value = home;
+      return;
+    }
+    _exitDialogOpen = true;
+    final ui = context.ui;
+    final exit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 620 * ui,
+          padding: EdgeInsets.all(32 * ui),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24 * ui),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '退出 BLT？',
+                style: TextStyle(fontSize: 32 * ui, color: Colors.black),
+              ),
+              SizedBox(height: 28 * ui),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  PinkButton(
+                    ui: ui,
+                    label: '继续观看',
+                    autofocus: true,
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                  ),
+                  SizedBox(width: 20 * ui),
+                  PinkButton(
+                    ui: ui,
+                    label: '退出',
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    _exitDialogOpen = false;
+    if (exit == true && mounted) await SystemNavigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     // 以1080p为基准缩放整体尺寸
     final ui = context.ui;
 
-    return Scaffold(
-      // TV 场景键盘以浮层出现，不压缩布局（避免侧边栏在键盘弹出时溢出）
-      resizeToAvoidBottomInset: false,
-      body: Container(
-        decoration: const BoxDecoration(gradient: pageBackgroundGradient),
-        child: Row(
-          children: [
-            ValueListenableBuilder(
-              valueListenable: _currentPageIndex,
-              builder: (context, index, _) => Sidebar(
-                onAvatarTap: _onAvatarTapped,
-                avatar: ListenableBuilder(
-                  listenable: loginInfoNotifier,
-                  builder: (context, child) => BilibiliAvatar(
-                    loginInfoNotifier.value.avatar,
-                    radius: 46 * ui,
-                  ),
-                ),
-                items: [
-                  for (var i = 0; i < _tabs.length; i++)
-                    SidebarItemData(
-                      icon: _tabs[i].icon,
-                      label: _tabs[i].label,
-                      selected: i == index,
-                      autofocus: i == index,
-                      onTap: () => _onTabTapped(_tabs[i]),
-                    ),
-                ],
-                footer: SidebarItemData(
-                  icon: Icons.settings_rounded,
-                  label: '设置',
-                  selected: false,
-                  onTap: () => Get.to(() => const SettingPage()),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ValueListenableBuilder(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        // TV 场景键盘以浮层出现，不压缩布局（避免侧边栏在键盘弹出时溢出）
+        resizeToAvoidBottomInset: false,
+        body: Container(
+          decoration: const BoxDecoration(gradient: pageBackgroundGradient),
+          child: Row(
+            children: [
+              ValueListenableBuilder(
                 valueListenable: _currentPageIndex,
-                builder: (context, index, _) {
-                  return ValueListenableBuilder<LoginInfo>(
-                    valueListenable: loginInfoNotifier,
-                    builder: (context, login, _) => LazyIndexedStack(
-                      // 登录状态变化时重建页面，避免残留在上一个账号的数据
-                      key: ValueKey(login.mid),
-                      index: index,
-                      children: _tabs.map((tab) => tab.child).toList(),
+                builder: (context, index, _) => Sidebar(
+                  onAvatarTap: _onAvatarTapped,
+                  avatar: ListenableBuilder(
+                    listenable: loginInfoNotifier,
+                    builder: (context, child) => BilibiliAvatar(
+                      loginInfoNotifier.value.avatar,
+                      radius: 46 * ui,
                     ),
-                  );
-                },
+                  ),
+                  items: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      SidebarItemData(
+                        icon: _tabs[i].icon,
+                        label: _tabs[i].label,
+                        selected: i == index,
+                        autofocus: i == index,
+                        onTap: () => _onTabTapped(_tabs[i]),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: ValueListenableBuilder(
+                  valueListenable: _currentPageIndex,
+                  builder: (context, index, _) {
+                    return ValueListenableBuilder<LoginInfo>(
+                      valueListenable: loginInfoNotifier,
+                      builder: (context, login, _) => LazyIndexedStack(
+                        // 登录状态变化时重建页面，避免残留在上一个账号的数据
+                        key: ValueKey(login.mid),
+                        index: index,
+                        children: _tabs.map((tab) => tab.child).toList(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

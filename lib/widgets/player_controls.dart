@@ -19,6 +19,9 @@ enum PlayerControlKind {
   aspect,
   loop,
   moreSettings,
+  defaultQuality,
+  decoder,
+  codec,
 }
 
 // 底部控制栏的一个控件
@@ -304,14 +307,16 @@ class PlayerControlButton extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 8 * ui),
-              Text(
-                action.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 28 * ui,
-                  fontWeight: FontWeight.w500,
-                  color: mainColor,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  action.label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 28 * ui,
+                    fontWeight: FontWeight.w500,
+                    color: mainColor,
+                  ),
                 ),
               ),
               SizedBox(height: 4 * ui),
@@ -320,17 +325,19 @@ class PlayerControlButton extends StatelessWidget {
                 child: action.value == null
                     ? null
                     : Center(
-                        child: Text(
-                          action.value!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 24 * ui,
-                            color: !action.enabled
-                                ? Colors.white24
-                                : focused
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.85),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            action.value!,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 24 * ui,
+                              color: !action.enabled
+                                  ? Colors.white24
+                                  : focused
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.85),
+                            ),
                           ),
                         ),
                       ),
@@ -418,7 +425,7 @@ class PlayerSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final ui = context.ui;
     return Container(
-      width: 484 * ui,
+      width: 600 * ui,
       padding: EdgeInsets.symmetric(vertical: 16 * ui, horizontal: 8 * ui),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.62),
@@ -491,8 +498,8 @@ class PlayerPanelTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   row.label ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  overflow: TextOverflow.visible,
                   style: TextStyle(fontSize: 28 * ui, color: mainColor),
                 ),
               ),
@@ -502,8 +509,8 @@ class PlayerPanelTile extends StatelessWidget {
                 if (row.value != null)
                   Text(
                     row.value!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    overflow: TextOverflow.visible,
                     style: TextStyle(
                       fontSize: 26 * ui,
                       color: row.enabled
@@ -867,8 +874,14 @@ Future<T?> showPlayerPicker<T>({
   required T current,
   required String Function(T value) labelOf,
 }) {
+  final ui = context.ui;
   return showModalBottomSheet<T>(
     context: context,
+    isScrollControlled: true,
+    constraints: BoxConstraints(
+      maxWidth: 1100 * ui,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+    ),
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black54,
     builder: (context) => _PlayerPickerSheet<T>(
@@ -917,54 +930,55 @@ class _PlayerPickerSheet<T> extends StatelessWidget {
                 padding: EdgeInsets.fromLTRB(24 * ui, 6 * ui, 24 * ui, 12 * ui),
                 child: Text(
                   title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   style: TextStyle(
                     fontSize: 24 * ui,
                     color: Colors.white.withValues(alpha: 0.72),
                   ),
                 ),
               ),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: 560 * ui),
+              Flexible(
                 child: ListView(
                   shrinkWrap: true,
+                  padding: EdgeInsets.all(16 * ui),
                   children: [
                     for (final item in options)
-                      DpadFocusable(
-                        autofocus: item == current,
-                        onSelect: () => Navigator.of(context).pop(item),
-                        builder: pinkFocusEffect(ui: ui, radius: 14 * ui),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 26 * ui,
-                            vertical: 16 * ui,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  labelOf(item),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 28 * ui,
-                                    fontWeight: item == current
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    color: item == current
-                                        ? biliPink
-                                        : Colors.white,
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(item),
+                        child: DpadFocusable(
+                          autofocus: item == current,
+                          onSelect: () => Navigator.of(context).pop(item),
+                          builder: pinkFocusEffect(ui: ui, radius: 14 * ui),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 26 * ui,
+                              vertical: 16 * ui,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    labelOf(item),
+                                    softWrap: true,
+                                    style: TextStyle(
+                                      fontSize: 28 * ui,
+                                      fontWeight: item == current
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: item == current
+                                          ? biliPink
+                                          : Colors.white,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (item == current)
-                                Icon(
-                                  Icons.check_rounded,
-                                  size: 34 * ui,
-                                  color: biliPink,
-                                ),
-                            ],
+                                if (item == current)
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 34 * ui,
+                                    color: biliPink,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

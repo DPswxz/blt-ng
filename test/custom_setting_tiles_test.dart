@@ -54,4 +54,19 @@ void main() {
     await _select(tester, find.text('3'));
     expect(changed, 3);
   });
+  testWidgets('设置项支持点击，不只支持实体遥控器确认', (tester) async {
+    bool? changed;
+    await tester.pumpWidget(
+      _wrap(
+        CustomSettingsSwitchTile(
+          title: '弹幕开关',
+          value: false,
+          onChanged: (v) => changed = v,
+        ),
+      ),
+    );
+    await tester.tap(find.text('弹幕开关'));
+    await tester.pump();
+    expect(changed, true);
+  });
 }

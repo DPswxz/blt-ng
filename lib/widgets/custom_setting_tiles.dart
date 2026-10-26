@@ -48,12 +48,14 @@ class CustomSettingsPanel extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   final Widget? leading;
   final String title;
+  final String? subtitle;
   final Widget trailing;
   final VoidCallback onSelect;
   final bool autofocus;
 
   const _SettingsTile({
     required this.title,
+    this.subtitle,
     required this.trailing,
     required this.onSelect,
     this.leading,
@@ -63,32 +65,59 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
-    return DpadFocusable(
-      autofocus: autofocus,
-      onSelect: onSelect,
-      builder: pinkFocusEffect(ui: ui, radius: 16 * ui),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20 * ui, vertical: 14 * ui),
-        child: Row(
-          children: [
-            if (leading != null) ...[
-              IconTheme(
-                data: IconThemeData(size: 28 * ui, color: biliPink),
-                child: leading!,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onSelect,
+      child: DpadFocusable(
+        autofocus: autofocus,
+        onSelect: onSelect,
+        builder: pinkFocusEffect(
+          ui: ui,
+          radius: 16 * ui,
+          focusedBackgroundColor: focusableSurfaceColor,
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20 * ui, vertical: 14 * ui),
+          child: Row(
+            children: [
+              if (leading != null) ...[
+                IconTheme(
+                  data: IconThemeData(size: 28 * ui, color: biliPink),
+                  child: leading!,
+                ),
+                SizedBox(width: 14 * ui),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 24 * ui,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      SizedBox(height: 8 * ui),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(
+                          fontSize: 18 * ui,
+                          height: 1.4,
+                          color: Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              SizedBox(width: 14 * ui),
+              SizedBox(width: 16 * ui),
+              trailing,
             ],
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 24 * ui, color: Colors.black87),
-              ),
-            ),
-            SizedBox(width: 16 * ui),
-            trailing,
-          ],
+          ),
         ),
       ),
     );
@@ -99,6 +128,7 @@ class _SettingsTile extends StatelessWidget {
 class CustomSettingsSwitchTile extends StatelessWidget {
   final Widget? leading;
   final String title;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
   final bool autofocus;
@@ -107,6 +137,7 @@ class CustomSettingsSwitchTile extends StatelessWidget {
     super.key,
     this.leading,
     required this.title,
+    this.subtitle,
     required this.value,
     required this.onChanged,
     this.autofocus = false,
@@ -118,6 +149,7 @@ class CustomSettingsSwitchTile extends StatelessWidget {
     return _SettingsTile(
       leading: leading,
       title: title,
+      subtitle: subtitle,
       autofocus: autofocus,
       onSelect: () => onChanged(!value),
       trailing: AnimatedContainer(
@@ -150,6 +182,7 @@ class CustomSettingsSwitchTile extends StatelessWidget {
 class CustomSettingsDropdownTile<T> extends StatelessWidget {
   final Widget? leading;
   final String title;
+  final String? subtitle;
   final T value;
   final List<T> items;
   final ValueChanged<T> onChanged;
@@ -159,6 +192,7 @@ class CustomSettingsDropdownTile<T> extends StatelessWidget {
     super.key,
     this.leading,
     required this.title,
+    this.subtitle,
     required this.value,
     required this.items,
     required this.onChanged,
@@ -168,6 +202,11 @@ class CustomSettingsDropdownTile<T> extends StatelessWidget {
   Future<void> _openPicker(BuildContext context) async {
     final selected = await showModalBottomSheet<T>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxWidth: 1100 * context.ui,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+      ),
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black26,
       builder: (_) => _SettingsPickerSheet<T>(value: value, items: items),
@@ -183,6 +222,7 @@ class CustomSettingsDropdownTile<T> extends StatelessWidget {
     return _SettingsTile(
       leading: leading,
       title: title,
+      subtitle: subtitle,
       autofocus: autofocus,
       onSelect: () => _openPicker(context),
       trailing: Row(
@@ -234,40 +274,44 @@ class _SettingsPickerSheet<T> extends StatelessWidget {
             constraints: BoxConstraints(maxHeight: 560 * ui),
             child: ListView(
               shrinkWrap: true,
+              padding: EdgeInsets.all(16 * ui),
               children: [
                 for (final item in items)
-                  DpadFocusable(
-                    autofocus: item == value,
-                    onSelect: () => Navigator.of(context).pop(item),
-                    builder: pinkFocusEffect(ui: ui, radius: 12 * ui),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 24 * ui,
-                        vertical: 12 * ui,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '$item',
-                              style: TextStyle(
-                                fontSize: 22 * ui,
-                                fontWeight: item == value
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: item == value
-                                    ? biliPink
-                                    : Colors.black87,
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(item),
+                    child: DpadFocusable(
+                      autofocus: item == value,
+                      onSelect: () => Navigator.of(context).pop(item),
+                      builder: pinkFocusEffect(ui: ui, radius: 12 * ui),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 24 * ui,
+                          vertical: 12 * ui,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '$item',
+                                style: TextStyle(
+                                  fontSize: 22 * ui,
+                                  fontWeight: item == value
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: item == value
+                                      ? biliPink
+                                      : Colors.black87,
+                                ),
                               ),
                             ),
-                          ),
-                          if (item == value)
-                            Icon(
-                              Icons.check_rounded,
-                              size: 28 * ui,
-                              color: biliPink,
-                            ),
-                        ],
+                            if (item == value)
+                              Icon(
+                                Icons.check_rounded,
+                                size: 28 * ui,
+                                color: biliPink,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),

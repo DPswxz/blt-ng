@@ -3,6 +3,8 @@
         android:label="BLT"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Prefer the established OpenGL/Skia path on the TCL T982 GPU. -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

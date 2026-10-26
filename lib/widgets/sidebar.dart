@@ -89,7 +89,7 @@ class _SidebarTab extends StatelessWidget {
       leading: Icon(
         item.icon,
         size: 48 * ui,
-        color: item.selected ? Colors.white : _unselectedIconColor,
+        color: item.selected ? navigationAccentColor : _unselectedIconColor,
       ),
       label: item.label,
       selected: item.selected,

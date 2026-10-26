@@ -165,12 +165,11 @@ class MediaCardInfo {
   }
 
   static MediaCardInfo? fromDynamicJson(Map<String, dynamic> json) {
-    final moduleDynamic = jsonMap(
-      jsonMap(json['modules'])?['module_dynamic'],
-    );
+    final moduleDynamic = jsonMap(jsonMap(json['modules'])?['module_dynamic']);
     final archive = jsonMap(moduleDynamic?['major'])?['archive'];
     final archiveMap = jsonMap(archive) ?? const <String, dynamic>{};
-    final author = jsonMap(jsonMap(json['modules'])?['module_author']) ??
+    final author =
+        jsonMap(jsonMap(json['modules'])?['module_author']) ??
         const <String, dynamic>{};
     return _build(
       type: MediaType.video,
@@ -201,9 +200,7 @@ class MediaCardInfo {
       bvid: jsonString(json['bvid']),
       // 搜索接口不返回cid（id字段是aid），留空由详情页从视频信息中获取
       title: title,
-      cover: pic.isEmpty
-          ? ''
-          : (pic.startsWith('https:') ? pic : 'https:$pic'),
+      cover: pic.isEmpty ? '' : (pic.startsWith('https:') ? pic : 'https:$pic'),
       duration: fromVideoDurationString(jsonString(json['duration'])),
       userMid: jsonInt(json['mid']),
       userName: jsonString(json['author']),
@@ -302,17 +299,32 @@ class Video {
     required this.episodes,
   });
 
+  // New rich descriptions may be present even when the legacy desc is empty.
+  static String descriptionFromJson(Map<String, dynamic> json) {
+    final plain = jsonString(json['desc']);
+    if (plain.trim().isNotEmpty) return plain;
+    return (jsonList(json['desc_v2']) ?? const [])
+        .map((value) => jsonMap(value))
+        .whereType<Map<String, dynamic>>()
+        .map((part) {
+          final text = jsonString(part['raw_text']);
+          return jsonInt(part['type']) == 2 && text.isNotEmpty
+              ? '@$text '
+              : text;
+        })
+        .join();
+  }
+
   // 核心字段（aid/标题）缺失时返回 null，由调用方转为可读错误
   static Video? fromJson(Map<String, dynamic> json) {
     final avid = jsonInt(json['aid']);
     final title = jsonString(json['title']);
     if (avid <= 0 || title.isEmpty) return null;
-    final episodes =
-        (jsonList(json['pages']) ?? const <dynamic>[])
-            .map((e) => jsonMap(e))
-            .whereType<Map<String, dynamic>>()
-            .map(Episode.fromJson)
-            .toList();
+    final episodes = (jsonList(json['pages']) ?? const <dynamic>[])
+        .map((e) => jsonMap(e))
+        .whereType<Map<String, dynamic>>()
+        .map(Episode.fromJson)
+        .toList();
     episodes.sort((a, b) => a.index.compareTo(b.index));
     final owner = jsonMap(json['owner']) ?? const <String, dynamic>{};
     // cid 缺失时回退到第一个分P，保证可播放
@@ -323,7 +335,7 @@ class Video {
       bvid: jsonString(json['bvid']),
       title: title,
       cover: jsonString(json['pic']),
-      desc: jsonString(json['desc']),
+      desc: descriptionFromJson(json),
       duration: Duration(seconds: jsonInt(json['duration'])),
       stat: Stat.fromJson(jsonMap(json['stat']) ?? const {}),
       userMid: jsonInt(owner['mid']),

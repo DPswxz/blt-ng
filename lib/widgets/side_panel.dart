@@ -34,7 +34,8 @@ class SidePanel extends StatelessWidget {
       width: width * ui,
       margin: margin ?? EdgeInsets.fromLTRB(28 * ui, 28 * ui, 0, 28 * ui),
       padding:
-          padding ?? EdgeInsets.symmetric(vertical: 24 * ui, horizontal: 12 * ui),
+          padding ??
+          EdgeInsets.symmetric(vertical: 24 * ui, horizontal: 12 * ui),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(radius * ui),
@@ -96,17 +97,8 @@ class SidePanelTile extends StatelessWidget {
           width: width * ui,
           height: height * ui,
           decoration: BoxDecoration(
-            gradient: selected ? pinkGradient : null,
-            borderRadius: BorderRadius.circular(radius * ui),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: biliPink.withValues(alpha: 0.35),
-                      blurRadius: 16 * ui,
-                      spreadRadius: 1 * ui,
-                    ),
-                  ]
-                : null,
+            color: selected ? focusableSurfaceColor : Colors.transparent,
+            borderRadius: BorderRadius.circular((radius - 3) * ui),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -122,7 +114,9 @@ class SidePanelTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: fontSize * ui,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    color: selected ? Colors.white : _unselectedTextColor,
+                    color: selected
+                        ? navigationAccentColor
+                        : _unselectedTextColor,
                   ),
                 ),
               ),

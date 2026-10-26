@@ -1,13 +1,13 @@
 import 'package:blt/pages/pages.dart' as app;
 import 'package:blt/storages/auth.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:blt/widgets/sidebar.dart';
 
 import '../helpers/page_test_env.dart';
 
 const _rcmdUrl =
     'https://api.bilibili.com/x/web-interface/wbi/index/top/feed/rcmd';
-const _historyUrl =
-    'https://api.bilibili.com/x/web-interface/history/cursor';
+const _historyUrl = 'https://api.bilibili.com/x/web-interface/history/cursor';
 
 void main() {
   setupPageTestEnv();
@@ -94,5 +94,44 @@ void main() {
     await flush(tester);
 
     expect(find.text('历史视频A'), findsOneWidget);
+  });
+  testWidgets('首页返回显示退出确认，取消保留首页', (tester) async {
+    mockRecommend();
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('退出 BLT？'), findsOneWidget);
+    await tester.tap(find.text('继续观看'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出 BLT？'), findsNothing);
+    expect(find.text('推荐视频A'), findsOneWidget);
+  });
+
+  testWidgets('搜索页返回先回首页，不直接退出应用', (tester) async {
+    mockRecommend();
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.tap(find.text('搜索'));
+    await flush(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('推荐视频A'), findsOneWidget);
+    expect(find.text('退出 BLT？'), findsNothing);
+  });
+  testWidgets('设置在主页面切换并保留侧栏，可返回首页', (tester) async {
+    mockRecommend();
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.tap(find.text('设置'));
+    await flush(tester);
+    expect(find.byType(Sidebar), findsOneWidget);
+    expect(find.text('偏好设置'), findsOneWidget);
+    expect(find.text('进入视频默认画质'), findsOneWidget);
+    final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    expect(sidebar.items.singleWhere((e) => e.label == '设置').selected, isTrue);
+    await tester.tap(find.text('首页'));
+    await flush(tester);
+    expect(find.text('推荐视频A'), findsOneWidget);
   });
 }

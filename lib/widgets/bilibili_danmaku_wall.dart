@@ -11,6 +11,11 @@ import 'package:flutter/material.dart';
 class BilibiliDanmakuWallController {
   // 弹幕墙就绪前为空，此时所有操作均为空操作
   DanmakuController? _controller;
+  Future<void> Function()? _reloadFunc;
+  Future<void> reloadSettings() async {
+    await _reloadFunc?.call();
+  }
+
   final ValueNotifier<bool> enableNotifier;
 
   BilibiliDanmakuWallController(bool enable)
@@ -81,6 +86,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     _timelineSubscription = widget.timeline.listen(_onPosition);
     _playingSubscription = widget.playing.listen(_onPlayingChanged);
     widget.controller.enableNotifier.addListener(_onEnableChanged);
+    widget.controller._reloadFunc = _init;
     widget.controller._clearFunc = _onClear;
     widget.controller._waitFunc = _onWait;
     _init();
@@ -101,6 +107,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
       oldWidget.controller._clearFunc = () {};
       oldWidget.controller._waitFunc = (_) {};
       widget.controller.enableNotifier.addListener(_onEnableChanged);
+      widget.controller._reloadFunc = _init;
       widget.controller._clearFunc = _onClear;
       widget.controller._waitFunc = _onWait;
     }
@@ -116,6 +123,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   @override
   void dispose() {
+    widget.controller._reloadFunc = null;
     _timelineSubscription?.cancel();
     _playingSubscription?.cancel();
     widget.controller.enableNotifier.removeListener(_onEnableChanged);

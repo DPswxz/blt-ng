@@ -1,3 +1,4 @@
+import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/apis/bilibili/media.dart' show ArchiveRelation;
 import 'package:blt/consts/bilibili.dart' show coverSizeRatio;
 import 'package:blt/icons/iconfont.dart';
@@ -76,6 +77,7 @@ Future<void> _pumpDetail(
   await pumpPage(
     tester,
     VideoDetailPage(
+      commentsLoader: (_, _, _) async => const CommentPage([], 0),
       video: _fakeVideo(),
       relation: ArchiveRelation(),
       followerCount: 12345,
@@ -175,4 +177,14 @@ void main() {
       expect(find.text('视频简介'), findsNothing);
     }
   });
+  testWidgets('信息卡留足32边距，分享按钮在稍后再看左侧', (tester) async {
+    await _pumpDetail(tester);
+    final card = tester.widget<Container>(find.byKey(const ValueKey('video-info-card')));
+    expect(card.padding,const EdgeInsets.all(32));
+    final share=find.byIcon(IconFont.share), later=find.byIcon(IconFont.playlist);
+    expect(tester.getCenter(share).dx,lessThan(tester.getCenter(later).dx));
+    expect(find.textContaining('测试视频简介'),findsOneWidget);
+    expect(tester.takeException(),isNull);
+  });
+
 }

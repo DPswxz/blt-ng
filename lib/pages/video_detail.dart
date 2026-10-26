@@ -1,3 +1,4 @@
+import 'package:blt/widgets/video_comments.dart';
 import 'package:blt/apis/bilibili/media.dart'
     show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
 import 'package:blt/apis/bilibili/recommend.dart' show fetchRelatedVideos;
@@ -135,6 +136,7 @@ class VideoDetailPage extends StatefulWidget {
   final List<MediaCardInfo> relatedVideos;
   final int? followerCount;
   final UserRelation userRelation;
+  final CommentLoader? commentsLoader;
 
   const VideoDetailPage({
     super.key,
@@ -144,6 +146,7 @@ class VideoDetailPage extends StatefulWidget {
     this.relatedVideos = const [],
     this.followerCount,
     this.userRelation = const UserRelation(),
+    this.commentsLoader,
   });
 
   @override
@@ -194,8 +197,15 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
               HardwareVideoDecoder.autoSafe.value,
         ) ??
         HardwareVideoDecoder.autoSafe;
+    if (await Settings.getInt(Settings.pathEngineVersion) != 2) {
+      await Settings.setString(Settings.pathDecoderMode, 'auto');
+      await Settings.setInt(Settings.pathEngineVersion, 2);
+    }
+    final decoderMode =
+        await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
     Get.to(
       () => VideoPlayerPage(
+        decoderMode: decoderMode,
         video: widget.video,
         cid: _currentEpisodeCid.value,
         danmu: danmu,
@@ -228,13 +238,40 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(flex: 42, child: _buildVideoHeader(ui)),
+            SizedBox(
+              height:
+                  ((MediaQuery.sizeOf(context).width - 48 * ui) *
+                              0.46 *
+                              9 /
+                              16 +
+                          8 * ui)
+                      .clamp(0.0, MediaQuery.sizeOf(context).height * 0.48),
+              child: _buildVideoHeader(ui),
+            ),
             SizedBox(height: 12 * ui),
-            widget.video.episodes.length <= 1
-                ? const Spacer(flex: 21)
-                : Expanded(flex: 21, child: _buildEpisodes(ui)),
+            SizedBox(
+              height: 200 * ui,
+              child: widget.video.episodes.length <= 1
+                  ? VideoCommentsPanel(
+                      avid: widget.video.avid,
+                      loader: widget.commentsLoader,
+                    )
+                  : Row(
+                      children: [
+                        Expanded(flex: 1, child: _buildEpisodes(ui)),
+                        SizedBox(width: 12 * ui),
+                        Expanded(
+                          flex: 2,
+                          child: VideoCommentsPanel(
+                            avid: widget.video.avid,
+                            loader: widget.commentsLoader,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
             SizedBox(height: 12 * ui),
-            Expanded(flex: 30, child: _buildRelatedVideos(ui)),
+            Expanded(flex: 32, child: _buildRelatedVideos(ui)),
           ],
         ),
       ),
@@ -346,7 +383,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
 
   Widget _buildVideoInfo(double ui) {
     return Container(
-      padding: EdgeInsets.fromLTRB(22 * ui, 16 * ui, 22 * ui, 12 * ui),
+      key: const ValueKey('video-info-card'),
+      padding: EdgeInsets.all(32 * ui),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -453,19 +491,19 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
           stretch(
             _RelationAction(
               ui: ui,
-              iconFont: IconFont.playlist,
+              iconFont: IconFont.share,
               iconScale: 1.1,
-              onPressed: _onAddToViewTapped,
+              label: amountString(widget.video.stat.shareCount),
+              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
             ),
           ),
           SizedBox(width: 12 * ui),
           stretch(
             _RelationAction(
               ui: ui,
-              iconFont: IconFont.share,
+              iconFont: IconFont.playlist,
               iconScale: 1.1,
-              label: amountString(widget.video.stat.shareCount),
-              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
+              onPressed: _onAddToViewTapped,
             ),
           ),
         ],
@@ -547,7 +585,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
           children: [
             Expanded(
               child: FixedLineAdaptiveText(
-                desc.isEmpty ? '暂无简介' : desc,
+                desc.isEmpty ? 'UP主未填写简介' : desc,
                 line: 2,
                 lineHeight: 1.35,
                 maxFontSize: 24 * ui,
@@ -739,7 +777,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
             SizedBox(height: 14 * ui),
             Expanded(
               child: ScrollText(
-                desc.isEmpty ? '暂无简介' : desc,
+                desc.isEmpty ? 'UP主未填写简介' : desc,
                 autofocus: true,
                 style: TextStyle(
                   fontSize: 24 * ui,
@@ -773,26 +811,17 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   Widget _buildEpisodes(double ui) {
     return PinkPanel(
       ui: ui,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PinkSectionHeader(
-            ui: ui,
-            icon: Container(
-              padding: EdgeInsets.all(6 * ui),
-              decoration: BoxDecoration(
-                gradient: pinkGradient,
-                borderRadius: BorderRadius.circular(10 * ui),
-              ),
-              child: Icon(
-                Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 18 * ui,
-              ),
+          SizedBox(
+            width: 60 * ui,
+            child: Text(
+              '分集',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22 * ui, fontWeight: FontWeight.w800),
             ),
-            title: '分集',
           ),
-          SizedBox(height: 10 * ui),
           Expanded(
             child: ValueListenableBuilder(
               valueListenable: _currentEpisodeCid,
@@ -825,19 +854,31 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   Widget _buildRelatedVideos(double ui) {
     return PinkPanel(
       ui: ui,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PinkSectionHeader(
-            ui: ui,
-            icon: Icon(
-              Icons.local_fire_department_rounded,
-              color: biliPink,
-              size: 40 * ui,
+          SizedBox(
+            width: 112 * ui,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.local_fire_department_rounded,
+                  color: biliPink,
+                  size: 30 * ui,
+                ),
+                SizedBox(height: 6 * ui),
+                Text(
+                  '相关推荐',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22 * ui,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-            title: '相关推荐',
           ),
-          SizedBox(height: 4 * ui),
           Expanded(
             child: VideoGridView(
               provider: _relatedVideosProvider,
@@ -996,38 +1037,12 @@ class _FollowButton extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return DpadFocusable(
-      onSelect: onPressed,
-      builder: pinkFocusEffect(ui: ui, radius: 28 * ui, scale: 1.05),
-      child: Container(
-        height: 56 * ui,
-        padding: EdgeInsets.symmetric(horizontal: 30 * ui),
-        decoration: BoxDecoration(
-          gradient: following ? null : pinkGradient,
-          color: following ? Colors.grey.shade200 : null,
-          borderRadius: BorderRadius.circular(28 * ui),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!following) ...[
-              Icon(Icons.add_rounded, color: Colors.white, size: 26 * ui),
-              SizedBox(width: 4 * ui),
-            ],
-            Text(
-              following ? '已关注' : '关注',
-              style: TextStyle(
-                fontSize: 24 * ui,
-                fontWeight: FontWeight.w600,
-                color: following ? Colors.grey.shade700 : Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => PinkButton(
+    ui: ui,
+    label: following ? '已关注' : '关注',
+    icon: following ? null : Icons.add_rounded,
+    onPressed: onPressed,
+  );
 }
 
 // 分P卡片
@@ -1046,34 +1061,24 @@ class _EpisodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = selected ? Colors.white : Colors.black87;
+    final textColor = selected ? navigationAccentColor : Colors.black87;
 
     return DpadFocusable(
       onSelect: onPressed,
       builder: pinkFocusEffect(
         ui: ui,
-        radius: 14 * ui,
+        radius: 17 * ui,
         unfocusedColor: Colors.white,
         scale: 1.04,
       ),
       child: Container(
         decoration: BoxDecoration(
           // 上下渐变：未选中"上粉下白"，选中"上浅粉下深粉"
-          gradient: selected
-              ? const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [biliPinkLight, biliPinkDeep],
-                )
-              : const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFFFEAF3), Colors.white],
-                ),
+          color: selected ? focusableSurfaceColor : Colors.white,
           borderRadius: BorderRadius.circular(14 * ui),
           boxShadow: [
             BoxShadow(
-              color: biliPink.withValues(alpha: selected ? 0.32 : 0.10),
+              color: biliPink.withValues(alpha: selected ? 0.12 : 0.06),
               blurRadius: selected ? 14 * ui : 8 * ui,
               offset: Offset(0, 4 * ui),
             ),
@@ -1084,7 +1089,7 @@ class _EpisodeCard extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: 12 * ui,
-              vertical: 12 * ui,
+              vertical: 8 * ui,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1096,7 +1101,7 @@ class _EpisodeCard extends StatelessWidget {
                     if (selected) ...[
                       Icon(
                         Icons.play_arrow_rounded,
-                        color: Colors.white,
+                        color: navigationAccentColor,
                         size: 30 * ui,
                       ),
                       SizedBox(width: 2 * ui),
@@ -1106,7 +1111,7 @@ class _EpisodeCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 22 * ui,
                         fontWeight: FontWeight.w900,
-                        color: selected ? Colors.white : biliPink,
+                        color: selected ? navigationAccentColor : biliPink,
                       ),
                     ),
                   ],
@@ -1132,7 +1137,7 @@ class _EpisodeCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16 * ui,
-                    color: selected ? Colors.white70 : Colors.grey[600],
+                    color: selected ? navigationAccentColor : Colors.grey[600],
                   ),
                 ),
               ],

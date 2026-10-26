@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _settingsKey = 'settings';
 
 class Settings {
+  static const pathEngineVersion = ['setting','player','engine_version'];
+  static const pathDefaultQuality = ['setting', 'player', 'default_quality'];
+  static const pathDecoderMode = ['setting', 'player', 'decoder_mode'];
+  static const pathPreferredCodec = ['setting', 'player', 'preferred_codec'];
   static const pathHASwitch = ['setting', 'player', 'ha'];
   static const pathVOSwitch = ['setting', 'player', 'vo'];
   static const pathHwdecSwitch = ['setting', 'player', 'hwdec'];

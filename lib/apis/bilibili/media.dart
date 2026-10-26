@@ -11,41 +11,88 @@ import 'dynamic.dart';
 
 final _log = log('media');
 
+double parseFrameRate(dynamic value) {
+  final parts = '$value'.split('/');
+  final numerator = double.tryParse(parts.first) ?? 0;
+  final denominator = parts.length > 1 ? double.tryParse(parts[1]) ?? 0 : 1;
+  return denominator > 0 ? numerator / denominator : 0;
+}
+
+const webPlayParameters = {
+  'fnval': 16 | 128,
+  'fourk': 1,
+  'qn': 120,
+  'fnver': 0,
+};
+
 class Quality {
   late final int id;
   late final String description;
+  final bool needsVip;
 
-  Quality({required this.id, required this.description});
+  Quality({required this.id, required this.description, this.needsVip = false});
 
   // 核心字段（清晰度 id）缺失时返回 null，调用方丢弃该项
   static Quality? fromJson(Map<String, dynamic> json) {
     final id = jsonInt(json['quality'], fallback: jsonInt(json['id']));
     if (id <= 0) return null;
-    return Quality(id: id, description: jsonString(json['new_description']));
+    return Quality(
+      id: id,
+      needsVip:
+          jsonBool(json['need_vip']) ||
+          const [112, 116, 120, 125, 126, 127, 129].contains(id),
+      description: jsonString(
+        json['new_description'],
+        fallback: jsonString(json['display_desc']),
+      ),
+    );
   }
 }
 
 class DashMediaData {
   final int quality;
+  final int codecId;
+  final String codecs;
+  final int width;
+  final int height;
+  final double fps;
+  final int bandwidth;
   final String baseUrl;
   final List<String> backupUrls;
 
   const DashMediaData({
     required this.quality,
+    this.codecId = 0,
+    this.codecs = '',
+    this.width = 0,
+    this.height = 0,
+    this.fps = 0,
+    this.bandwidth = 0,
     required this.baseUrl,
     required this.backupUrls,
   });
 
   // 核心字段（播放地址）缺失时返回 null，调用方丢弃该项
   static DashMediaData? fromJson(Map<String, dynamic> json) {
-    final baseUrl = jsonString(json['base_url']);
+    final baseUrl = jsonString(
+      json['base_url'],
+      fallback: jsonString(json['baseUrl']),
+    );
     if (baseUrl.isEmpty) return null;
     return DashMediaData(
       quality: jsonInt(json['id']),
+      codecId: jsonInt(json['codecid']),
+      codecs: jsonString(json['codecs']),
+      width: jsonInt(json['width']),
+      height: jsonInt(json['height']),
+      fps: parseFrameRate(json['frame_rate'] ?? json['frameRate']),
+      bandwidth: jsonInt(json['bandwidth']),
       baseUrl: baseUrl,
-      backupUrls: (jsonList(json['backup_url']) ?? const <dynamic>[])
-          .whereType<String>()
-          .toList(),
+      backupUrls:
+          (jsonList(json['backup_url'] ?? json['backupUrl']) ??
+                  const <dynamic>[])
+              .whereType<String>()
+              .toList(),
     );
   }
 }
@@ -105,7 +152,7 @@ Future<GetVideoPlayURLResponse> getVideoPlayURL({
   String? bvid,
   required int cid,
 }) async {
-  Map<String, dynamic> queryParams = {'cid': cid, 'fnval': 16};
+  Map<String, dynamic> queryParams = {'cid': cid, ...webPlayParameters};
   if (avid != null) {
     queryParams['avid'] = avid;
   } else {

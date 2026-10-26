@@ -32,10 +32,10 @@ class SearchPage extends StatefulWidget {
   const SearchPage({super.key, this.tappedListener});
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  State<SearchPage> createState() => SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class SearchPageState extends State<SearchPage> {
   static const _suggestDebounce = Duration(milliseconds: 250);
   static const _hotWordCount = 10;
 
@@ -95,6 +95,14 @@ class _SearchPageState extends State<SearchPage> {
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  bool dismissInput() {
+    if (!_inputFocusNode.hasFocus && _suggestions.value.isEmpty) return false;
+    _closeSuggestions();
+    _inputFocusNode.unfocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    return true;
   }
 
   void _closeSuggestions() {
@@ -203,7 +211,9 @@ class _SearchPageState extends State<SearchPage> {
       _provider.addAll(result.videos);
       _provider.hasMore = result.pages > 1 && result.videos.isNotEmpty;
       setState(() {
-        _state = result.videos.isEmpty ? _SearchState.empty : _SearchState.success;
+        _state = result.videos.isEmpty
+            ? _SearchState.empty
+            : _SearchState.success;
       });
     } catch (_) {
       if (!mounted || seq != _searchSeq) return;
@@ -525,10 +535,7 @@ class _SearchPageState extends State<SearchPage> {
             Text(
               '没有找到「$_keyword」相关视频',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 28 * ui,
-                color: Colors.grey.shade700,
-              ),
+              style: TextStyle(fontSize: 28 * ui, color: Colors.grey.shade700),
             ),
             if (_hotWords.isNotEmpty) ...[
               SizedBox(height: 32 * ui),
@@ -564,11 +571,7 @@ class _SearchPageState extends State<SearchPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.account_circle_rounded,
-            size: 96 * ui,
-            color: biliPink,
-          ),
+          Icon(Icons.account_circle_rounded, size: 96 * ui, color: biliPink),
           SizedBox(height: 16 * ui),
           Text(
             '登录后即可搜索视频',

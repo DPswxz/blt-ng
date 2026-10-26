@@ -29,7 +29,9 @@ Future<void> initFileLogging({Directory? directory}) async {
 // 带 tag 的日志工厂
 Logger log(String tag) => Logger(
   filter: kReleaseMode ? ProductionFilter() : DevelopmentFilter(),
-  level: kReleaseMode ? Level.warning : Level.trace,
+  level: kReleaseMode
+      ? (tag == 'playback' ? Level.info : Level.warning)
+      : Level.trace,
   printer: TagPrinter(tag),
   output: MultiOutput(List.of(_outputs)),
 );

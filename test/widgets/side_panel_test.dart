@@ -1,5 +1,6 @@
 import 'package:blt/consts/color.dart';
 import 'package:blt/widgets/side_panel.dart';
+import 'package:blt/widgets/pink_style.dart';
 import 'package:blt/widgets/sidebar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,7 +52,10 @@ void main() {
         .first;
     final panel = tester.widget<Container>(panelContainer);
     expect(panel.margin, const EdgeInsets.fromLTRB(28, 28, 0, 28));
-    expect(panel.padding, const EdgeInsets.symmetric(vertical: 24, horizontal: 12));
+    expect(
+      panel.padding,
+      const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+    );
 
     final decoration = panel.decoration! as BoxDecoration;
     expect(decoration.color, Colors.white);
@@ -84,16 +88,16 @@ void main() {
     final decoration = _decorationWhere(
       tester,
       tile,
-      (d) => d.gradient != null,
+      (d) => d.color == focusableSurfaceColor,
     );
-    expect(decoration.gradient, pinkGradient);
-    expect(decoration.borderRadius, BorderRadius.circular(26));
-    expect(decoration.boxShadow, hasLength(1));
+    expect(decoration.gradient, isNull);
+    expect(decoration.borderRadius, BorderRadius.circular(23));
+    expect(decoration.boxShadow, isNull);
 
     final text = tester.widget<Text>(find.text('测试项'));
     expect(text.style!.fontSize, 24);
     expect(text.style!.fontWeight, FontWeight.w700);
-    expect(text.style!.color, Colors.white);
+    expect(text.style!.color, navigationAccentColor);
 
     await tester.tap(tile);
     expect(taps, 1);
@@ -145,7 +149,14 @@ void main() {
 
     final tile = find.byType(SidePanelTile);
     expect(tester.getSize(_tileBox(tile)), const Size(116, 112));
-    expect(_decorationWhere(tester, tile, (d) => d.gradient != null).borderRadius, BorderRadius.circular(28));
+    expect(
+      _decorationWhere(
+        tester,
+        tile,
+        (d) => d.color == focusableSurfaceColor,
+      ).borderRadius,
+      BorderRadius.circular(25),
+    );
     expect(tester.widget<Text>(find.text('测试UP')).style!.fontSize, 22);
   });
 

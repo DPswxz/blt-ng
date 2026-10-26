@@ -627,4 +627,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, PlayerAspectMode.cover);
   });
+  testWidgets('大量长选项保持在选择框内，可滚动且不使用省略号', (tester) async {
+    _setScreen(tester, const Size(1280, 720));
+    final options = List.generate(25, (i) => '选项 $i：一段比较长的设置名称需要完整显示并且支持换行');
+    String? selected;
+    await tester.pumpWidget(
+      _host(
+        ui: 2 / 3,
+        child: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () async {
+              selected = await showPlayerPicker<String>(
+                context: context,
+                title: '完整显示设置选项',
+                options: options,
+                current: options.first,
+                labelOf: (v) => v,
+              );
+            },
+            child: const Text('打开长菜单'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开长菜单'));
+    await tester.pumpAndSettle();
+    final first = tester.widget<Text>(find.text(options.first));
+    expect(first.overflow, isNot(TextOverflow.ellipsis));
+    await tester.scrollUntilVisible(
+      find.text(options.last),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(find.text(options.last));
+    expect(rect.bottom, lessThanOrEqualTo(720));
+    expect(rect.right, lessThanOrEqualTo(1280));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text(options.last));
+    await tester.pumpAndSettle();
+    expect(selected, options.last);
+  });
 }

@@ -1,3 +1,4 @@
+import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/apis/bilibili/media.dart' show ArchiveRelation;
 import 'package:blt/icons/iconfont.dart';
 import 'package:blt/models/video.dart';
@@ -50,6 +51,7 @@ Future<void> _pumpDetail(WidgetTester tester) async {
   await pumpPage(
     tester,
     VideoDetailPage(
+      commentsLoader: (_, _, _) async => const CommentPage([], 0),
       video: _fakeVideo(),
       relation: ArchiveRelation(),
       followerCount: 10,

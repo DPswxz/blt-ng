@@ -1,3 +1,4 @@
+import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/apis/bilibili/media.dart' show ArchiveRelation;
 import 'package:blt/icons/iconfont.dart';
 import 'package:blt/models/video.dart';
@@ -36,8 +37,10 @@ Video _fakeVideo() => Video(
   ],
 );
 
-Widget _host(Widget child, double factor) =>
-    UiScale(factor: factor, child: MaterialApp(home: child));
+Widget _host(Widget child, double factor) => UiScale(
+  factor: factor,
+  child: MaterialApp(home: child),
+);
 
 Future<void> _pumpDetail(
   WidgetTester tester, {
@@ -51,6 +54,7 @@ Future<void> _pumpDetail(
   await tester.pumpWidget(
     _host(
       VideoDetailPage(
+        commentsLoader: (_, _, _) async => const CommentPage([], 0),
         video: _fakeVideo(),
         relation: ArchiveRelation(),
         followerCount: followerCount,

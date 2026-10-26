@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'package:blt/utils/playback_policy.dart';
+import 'package:blt/utils/log.dart';
 
 import 'package:blt/apis/bilibili/client.dart' show bilibiliHttpClient;
 import 'package:blt/apis/bilibili/history.dart';
 import 'package:blt/apis/bilibili/media.dart'
-    show getVideoPlayURL, GetVideoPlayURLResponse, Quality, DashData;
+    show
+        getVideoPlayURL,
+        GetVideoPlayURLResponse,
+        Quality,
+        DashData,
+        DashMediaData;
 import 'package:blt/consts/settings.dart';
 import 'package:blt/icons/iconfont.dart';
 import 'package:blt/models/video.dart' as model;
-import 'package:blt/pages/setting.dart';
 import 'package:blt/storages/auth.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:blt/utils/stream.dart';
@@ -20,7 +26,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
+import 'package:blt/utils/tcl_video_controller.dart';
 
 const _step = Duration(seconds: 5);
 const _danmakuWaitDuration = Duration(seconds: 5);
@@ -30,6 +36,9 @@ class VideoPlayerPage extends StatefulWidget {
   final model.Video video;
   final int cid;
 
+  final String decoderMode;
+  final Duration? initialPosition;
+  final bool recoveredNative;
   final bool danmu;
   final bool ha;
   final VideoOutputDrivers vo;
@@ -39,6 +48,9 @@ class VideoPlayerPage extends StatefulWidget {
     super.key,
     required this.video,
     required this.cid,
+    this.decoderMode = 'auto',
+    this.initialPosition,
+    this.recoveredNative = false,
     required this.danmu,
     required this.ha,
     required this.vo,
@@ -55,7 +67,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late final ValueNotifier<Quality?> _currentQuality;
   late int _playingCid; // 当前实际播放的分P，用于进度上报，避免与_currentCid错配
 
-  late final VideoController _controller;
+  late final TclVideoController _controller;
   late final BilibiliDanmakuWallController _danmakuCtl;
 
   late final FocusNode _screenFocusNode;
@@ -65,6 +77,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late final ValueNotifier<PlayerAspectMode> _aspectMode;
   late final ValueNotifier<PlayerLoopMode> _loopMode;
 
+  bool get _directOutput =>
+      widget.decoderMode == 'auto' || widget.decoderMode == 'native';
+  String get _hwdec => widget.decoderMode == 'software'
+      ? 'no'
+      : widget.decoderMode == 'copy'
+      ? 'mediacodec-copy'
+      : 'mediacodec';
+  int _defaultQuality = 80;
+  int _preferredCodec = 0;
+  StreamSubscription<PlayerLog>? _metricsSub;
+  Timer? _codecRecoveryTimer;
+  Timer? _telemetryTimer;
   Timer? _heartbeatTimer; // 播放心跳timer
   Timer? _autoNextTimer; // 播完自动切下一分P的计时器
   late final StreamController<bool> loading;
@@ -84,14 +108,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _currentCid = ValueNotifier(widget.cid);
     _currentCid.addListener(_onEpisodeChanged);
     _playingCid = widget.cid;
-    _controller = VideoController(
-      Player(),
-      configuration: VideoControllerConfiguration(
-        vo: widget.vo.value,
-        hwdec: widget.hwdec.value,
-        enableHardwareAcceleration: widget.ha,
-      ),
-    );
+    _controller = TclVideoController(widget.decoderMode);
+    _metricsSub = _controller.player.stream.log.listen((event) {
+      if (event.prefix == 'media3' || event.text.startsWith('BLT_METRICS ')) {
+        log('playback').i(event.text.trim());
+        _acceptMetrics(event.text);
+      }
+    });
     _completedSub = _controller.player.stream.completed.listen((v) {
       if (v) _onPlayCompleted();
     });
@@ -108,10 +131,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     loading = StreamController<bool>();
     _loadPlayerSettings().ignore();
     _onEpisodeChanged();
+    _telemetryTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _logDecoderState().ignore(),
+    );
   }
 
   @override
   void dispose() {
+    _codecRecoveryTimer?.cancel();
+    _metricsSub?.cancel();
+    _telemetryTimer?.cancel();
     if (_heartbeatTimer != null) _heartbeatTimer!.cancel();
     _cancelAutoNext();
     _completedSub?.cancel();
@@ -173,6 +203,40 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   void _onPlayError(String err) {
     if (!mounted) return;
+    if (_controller.isExo) {
+      log('playback').w(err);
+      _recoverExo().ignore();
+      return;
+    }
+    if (isCodecError(err)) {
+      log(
+        'playback',
+      ).w('codec initialization error; mode=${widget.decoderMode}');
+      if (_directOutput && !_recovering) {
+        // MediaCodec may report a transient initialization failure while the
+        // texture surface is being attached. Allow the plugin to reinitialize vid.
+        _codecRecoveryTimer?.cancel();
+        final position = _controller.player.state.position;
+        _codecRecoveryTimer = Timer(const Duration(seconds: 3), () {
+          if (!mounted) return;
+          if (_controller.player.state.position >
+              position + const Duration(milliseconds: 500)) {
+            log(
+              'playback',
+            ).i('Native playback progressed after surface initialization');
+            return;
+          }
+          if (_recoveryBudget > 0) _recoverCodec().ignore();
+        });
+        return;
+      }
+      if (_recovering) {
+        _pendingCodecError = true;
+      } else if (_recoveryBudget > 0) {
+        _recoverCodec().ignore();
+      }
+      return;
+    }
     // 视频源失败：仅在"无法打开"类错误时轮换到下一个备份地址，其他错误直接提示
     if (_videoUrls.isNotEmpty && err.contains(_videoUrls.first)) {
       if (!err.contains('Can not open external file')) {
@@ -206,6 +270,76 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     pushTooltipError(context, err);
   }
 
+  Future<void> _recoverExo() async {
+    if (!mounted || _recoveryBudget <= 0) return;
+    if (_recovering) {
+      _pendingCodecError = true;
+      return;
+    }
+    _recovering = true;
+    _pendingCodecError = false;
+    _recoveryBudget--;
+    try {
+      if (_streamIndex + 1 < _streamCandidates.length) {
+        final next = _streamCandidates[++_streamIndex];
+        _videoUrls = [next.baseUrl, ...next.backupUrls];
+        log('playback').i('ExoPlayer retry same quality codec=${next.codecId}');
+        await _restartPlayback();
+      } else if (_videoUrls.length > 1) {
+        _videoUrls.removeAt(0);
+        await _restartPlayback();
+      } else if (!await _lowerAutomaticQuality()) {
+        _recoveryBudget = 0;
+        if (mounted) pushTooltipError(context, '播放失败，请切换较低画质或其他解码方式');
+      }
+    } finally {
+      _recovering = false;
+      if (_pendingCodecError && mounted && _recoveryBudget > 0) {
+        scheduleMicrotask(() => _recoverExo().ignore());
+      }
+    }
+  }
+
+  Future<void> _recoverCodec() async {
+    if (_recoveryBudget-- <= 0) return;
+    _recovering = true;
+    _pendingCodecError = false;
+    try {
+      if (_directOutput) {
+        if (!widget.recoveredNative) _replaceDecoder('gpu', recovered: true);
+        return;
+      }
+      if (!_copyFallback) {
+        _copyFallback = true;
+        await (_controller.player as NativePlayer).setProperty(
+          'hwdec',
+          'mediacodec-copy',
+        );
+      } else if (_streamIndex + 1 < _streamCandidates.length) {
+        final next = _streamCandidates[++_streamIndex];
+        _videoUrls = [next.baseUrl, ...next.backupUrls];
+        _copyFallback = false;
+        await (_controller.player as NativePlayer).setProperty(
+          'hwdec',
+          'mediacodec',
+        );
+      } else {
+        if (await _lowerAutomaticQuality()) return;
+        _recoveryBudget = 0;
+        if (mounted) pushTooltipError(context, '当前画质解码失败，请切换较低画质');
+        return;
+      }
+      await _restartPlayback();
+    } finally {
+      _recovering = false;
+      if (_pendingCodecError && _recoveryBudget > 0 && mounted) {
+        scheduleMicrotask(() {
+          if (mounted) _recoverCodec().ignore();
+        });
+      }
+    }
+  }
+
   // 切换视频备份地址后重新打开媒体，保留播放进度、弹幕时间轴与音轨
   Future<void> _restartPlayback() async {
     if (_videoUrls.isEmpty) return;
@@ -213,19 +347,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     // 重置弹幕时间轴，避免重开后按旧时间轴推送导致长时间无弹幕
     _danmakuCtl.clear();
     try {
-      await _controller.player.open(
-        Media(
-          _videoUrls.first,
-          httpHeaders: bilibiliHttpClient.options.headers
-              .cast<String, String>(),
-          start: start,
-        ),
+      await _controller.openDash(
+        _videoUrls.first,
+        _audioUrls.isEmpty ? null : _audioUrls.first,
+        bilibiliHttpClient.options.headers.cast<String, String>(),
+        start,
       );
-      if (_audioUrls.isNotEmpty) {
-        await _controller.player.setAudioTrack(
-          AudioTrack.uri(_audioUrls.first),
-        );
-      }
       await _controller.player.setRate(_playbackRate.value);
       await _controller.player.setPlaylistMode(
         _toPlaylistMode(_loopMode.value),
@@ -271,6 +398,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Future<void> _onEpisodeChanged() async {
     // 快照本次请求的分P，若处理过程中用户又切了分P则丢弃本次结果
     final cid = _currentCid.value;
+    _recoveryBudget = 8;
     // 新分P就绪前禁止画质等操作，避免用到旧分P的播放信息
     _videoReady.value = false;
     // 结束心跳
@@ -315,24 +443,44 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         throw Exception('该视频暂无可播放清晰度');
       }
 
-      final qualityID =
-          await Settings.getInt(Settings.pathQualitySwitch) ??
-          info.defaultQualityID;
-      // 用户设置的画质不可用时依次回退到默认画质、第一个可用画质
-      final quality = info.supportFormats.firstWhere(
-        (e) => e.id == qualityID,
-        orElse: () => info.supportFormats.firstWhere(
-          (e) => e.id == info.defaultQualityID,
-          orElse: () => info.supportFormats.first,
-        ),
+      final available = info.supportFormats
+          .where((q) => info.dashData.video.any((v) => v.quality == q.id))
+          .toList();
+      if (available.isEmpty) throw Exception('当前账号没有可播放的视频流，请登录后重试');
+      // Each new video starts with the TV's smooth default. Manual 4K affects this video only.
+      _defaultQuality =
+          await Settings.getInt(Settings.pathDefaultQuality) ?? 80;
+      _preferredCodec = await Settings.getInt(Settings.pathPreferredCodec) ?? 0;
+      const qualityID = 0;
+      _autoQuality = qualityID == 0;
+      var quality = available.firstWhere(
+        (q) => q.id == qualityID,
+        orElse: () => defaultQualityOrder(available, _defaultQuality).isNotEmpty
+            ? defaultQualityOrder(available, _defaultQuality).first
+            : available.last,
       );
+      if (qualityID == 0) {
+        final ranked = defaultQualityOrder(available, _defaultQuality);
+        if (ranked.isEmpty) throw Exception('该视频没有可用的 1080P 或更低画质，请手动选择');
+        for (final candidate in ranked) {
+          if ((await compatibleStreams(
+            info.dashData.video
+                .where((v) => v.quality == candidate.id)
+                .toList(),
+          )).isNotEmpty) {
+            quality = candidate;
+            break;
+          }
+        }
+      }
+      _videoPlayURLInfo = info;
       // 打开媒体前再校验一次分P未变，避免并发切P时旧请求最后执行覆盖新请求
       if (!mounted || cid != _currentCid.value) return;
 
       await _playDashMedia(
         info.dashData,
         quality,
-        start: playInfo?.lastPlayTime,
+        start: widget.initialPosition ?? playInfo?.lastPlayTime,
       );
       if (!mounted || cid != _currentCid.value) return;
 
@@ -354,7 +502,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         (_) => _onHeartbeat(),
       );
     } catch (e) {
-      if (mounted) showAppError(context, e);
+      if (mounted) {
+        if (isCodecError(e.toString())) {
+          _onPlayError(e.toString());
+        } else {
+          showAppError(context, e);
+        }
+      }
     } finally {
       if (!loading.isClosed) loading.sink.add(false);
       // 仅当前分P的请求仍有效时恢复弹幕，避免旧请求覆盖新请求的状态
@@ -374,8 +528,57 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     ).ignore();
   }
 
+  Future<void> _logDecoderState() async {
+    if (!mounted) return;
+    final state = _controller.player.state;
+    log('playback').i(
+      'sample mode=${widget.decoderMode} ready=${_videoReady.value} position=${state.position.inMilliseconds} playing=${state.playing} buffering=${state.buffering} buffered=${state.buffer.inMilliseconds}',
+    );
+    if (!_videoReady.value) return;
+    if (_controller.isExo) {
+      await (_controller.player as TclExoPlayer).metrics();
+      return;
+    }
+    // command() uses mpv_command_async. Never synchronously query mpv from
+    // Flutter's UI isolate: a native rendering lock can freeze its event loop.
+    await (_controller.player as NativePlayer).command([
+      'expand-properties',
+      'print-text',
+      r'BLT_METRICS hw=${hwdec-current} codec=${video-codec} decoderDrops=${decoder-frame-drop-count} renderDrops=${frame-drop-count} buffering=${paused-for-cache} cache=${demuxer-cache-duration}',
+    ], waitForInitialization: false);
+  }
+
+  void _acceptMetrics(String value) {
+    final match = RegExp(
+      r'decoderDrops=(\d+) renderDrops=(\d+)',
+    ).firstMatch(value);
+    if (match == null) return;
+    final dropped = int.parse(match[1]!) + int.parse(match[2]!);
+    final position = _controller.player.state.position;
+    final elapsed = _lastSamplePosition == null
+        ? 0
+        : (position - _lastSamplePosition!).inSeconds;
+    final delta = dropped - _lastDropped;
+    _lastSamplePosition = position;
+    _lastDropped = dropped;
+    if (_autoQuality &&
+        elapsed >= 8 &&
+        elapsed <= 22 &&
+        delta >= 45 &&
+        _controller.player.state.playing &&
+        !_recovering &&
+        !_optimizing) {
+      _lowerAutomaticQuality().ignore();
+    }
+  }
+
   Future<void> _onQualityChange(Quality sf) async {
     if (!mounted || _currentQuality.value?.id == sf.id) return;
+    if (!_videoPlayURLInfo.dashData.video.any((v) => v.quality == sf.id)) {
+      pushTooltipInfo(context, '该画质当前无播放权限或视频流，请检查登录与大会员状态');
+      return;
+    }
+    _recoveryBudget = 8;
     // 快照当前分P，切画质期间若用户切换了分P则不恢复弹幕，避免覆盖新分P的状态
     final cid = _currentCid.value;
 
@@ -395,7 +598,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       // 播放成功后才提交画质
       _currentQuality.value = sf;
     } catch (e) {
-      if (mounted) showAppError(context, e);
+      if (mounted) {
+        if (isCodecError(e.toString())) {
+          _onPlayError(e.toString());
+        } else {
+          showAppError(context, e);
+        }
+      }
     } finally {
       if (!loading.isClosed) loading.sink.add(false);
       if (mounted && cid == _currentCid.value) {
@@ -405,17 +614,83 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
+  List<DashMediaData> _streamCandidates = [];
+  int _streamIndex = 0;
+  bool _copyFallback = false;
+  bool _recovering = false;
+  bool _pendingCodecError = false;
+  int _recoveryBudget = 8;
+  bool _autoQuality = true;
+  Quality? _attemptQuality;
+  int _lastDropped = 0;
+  Duration? _lastSamplePosition;
+  bool _optimizing = false;
+
+  Future<bool> _lowerAutomaticQuality() async {
+    if (!_autoQuality || _attemptQuality == null || _optimizing || !mounted) {
+      return false;
+    }
+    _optimizing = true;
+    try {
+      final lower = smoothQualityOrder(
+        _videoPlayURLInfo.supportFormats,
+      ).where((q) => q.id < _attemptQuality!.id).toList();
+      for (final quality in lower) {
+        if ((await compatibleStreams(
+          _videoPlayURLInfo.dashData.video
+              .where((v) => v.quality == quality.id)
+              .toList(),
+        )).isEmpty) {
+          continue;
+        }
+        final position = _controller.player.state.position;
+        await _playDashMedia(
+          _videoPlayURLInfo.dashData,
+          quality,
+          start: position,
+        );
+        if (!mounted) return false;
+        _currentQuality.value = quality;
+        _lastSamplePosition = null;
+        _lastDropped = 0;
+        pushTooltipInfo(context, '已自动调整为 ${_qualityLabel(quality)}，优先流畅播放');
+        return true;
+      }
+      return false;
+    } finally {
+      _optimizing = false;
+    }
+  }
+
   List<String> _videoUrls = [];
   List<String> _audioUrls = [];
+  DashMediaData? _currentAudio;
 
   Future<void> _playDashMedia(
     DashData media,
     Quality quality, {
     Duration? start,
   }) async {
-    var video = media.video.firstWhere(
-      (e) => e.quality == quality.id,
-      orElse: () => throw Exception('该画质无可用视频流'),
+    await _controller.ready.timeout(const Duration(seconds: 15));
+    if (!mounted) return;
+    _attemptQuality = quality;
+    final candidates = await compatibleStreams(
+      media.video.where((v) => v.quality == quality.id).toList(),
+    );
+    if (candidates.isEmpty) throw Exception('电视不支持该画质的编码，请选择较低画质');
+    _streamCandidates = candidates;
+    _streamIndex = 0;
+    _copyFallback = false;
+    if (_preferredCodec != 0) {
+      candidates.sort(
+        (a, b) => (a.codecId == _preferredCodec ? 0 : 1).compareTo(
+          b.codecId == _preferredCodec ? 0 : 1,
+        ),
+      );
+    }
+    final video = candidates.first;
+    log('playback').i(
+      'TCL stream q=${quality.id} codec=${video.codecId} ${video.width}x${video.height} fps=${video.fps}; mode=${widget.decoderMode} hwdec=$_hwdec',
     );
     var videoUrls = [
       video.baseUrl,
@@ -424,26 +699,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (videoUrls.isEmpty) {
       throw Exception('该画质无可用视频流');
     }
-    var audioUrls = media.audio
-        .expand((e) => [e.baseUrl, ...e.backupUrls])
-        .where((u) => u.isNotEmpty)
-        .toList();
+    final audioTracks = [...media.audio]
+      ..sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
+    _currentAudio = audioTracks.isEmpty ? null : audioTracks.first;
+    var audioUrls =
+        (_currentAudio == null ? <DashMediaData>[] : [_currentAudio!])
+            .expand((e) => [e.baseUrl, ...e.backupUrls])
+            .where((u) => u.isNotEmpty)
+            .toList();
 
     // 先记录全部候选地址，供_onPlayError在首个地址失败时轮换备份地址
     _videoUrls = videoUrls;
     _audioUrls = audioUrls;
 
-    // 先打开视频流，成功后再设置DASH音轨，两者完成前不提交播放成功状态
-    await _controller.player.open(
-      Media(
-        videoUrls.first,
-        httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
-        start: start,
-      ),
-    );
-    if (audioUrls.isNotEmpty) {
-      await _controller.player.setAudioTrack(AudioTrack.uri(audioUrls.first));
+    if (!_controller.isExo) {
+      await (_controller.player as NativePlayer).setProperty('hwdec', _hwdec);
     }
+    await _controller.openDash(
+      videoUrls.first,
+      audioUrls.isEmpty ? null : audioUrls.first,
+      bilibiliHttpClient.options.headers.cast<String, String>(),
+      start,
+    );
   }
 
   void _cancelAutoNext() {
@@ -515,17 +792,157 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     Settings.setBool(Settings.pathDanmuSwitch, _danmakuCtl.enabled).ignore();
   }
 
-  void _onUnsupportedTapped() {
-    pushTooltipInfo(context, '暂不支持该功能！');
+  String _audioLabel(DashMediaData? audio) {
+    if (audio == null) return '默认音轨';
+    return switch (audio.quality) {
+      30216 => 'AAC · 64K',
+      30232 => 'AAC · 132K',
+      30280 => 'AAC · 192K',
+      _ =>
+        audio.bandwidth > 0
+            ? '${(audio.bandwidth / 1000).round()} kbps'
+            : '默认音轨',
+    };
   }
 
-  Future<void> _onMoreSettingsTapped() async {
-    await Get.to(() => const SettingPage());
+  Future<void> _onAudioTapped() async {
+    if (!_videoReady.value) return;
+    final tracks = _videoPlayURLInfo.dashData.audio;
+    if (tracks.length <= 1) {
+      pushTooltipInfo(context, '该视频只有一条默认音轨');
+      return;
+    }
+    final selected = await showPlayerPicker<DashMediaData>(
+      context: context,
+      title: '音轨',
+      options: tracks,
+      current: _currentAudio ?? tracks.first,
+      labelOf: _audioLabel,
+    );
+    if (!mounted || selected == null || selected == _currentAudio) return;
+    try {
+      await _controller.player.setAudioTrack(AudioTrack.uri(selected.baseUrl));
+      _audioUrls = [selected.baseUrl, ...selected.backupUrls];
+      setState(() => _currentAudio = selected);
+    } catch (_) {
+      if (mounted) pushTooltipError(context, '音轨切换失败，保留原音轨');
+    }
+  }
+
+  void _replaceDecoder(String mode, {bool recovered = false}) {
+    Get.off(
+      () => VideoPlayerPage(
+        video: widget.video,
+        cid: _currentCid.value,
+        danmu: _danmakuCtl.enabled,
+        ha: widget.ha,
+        vo: widget.vo,
+        hwdec: widget.hwdec,
+        decoderMode: mode,
+        initialPosition: _controller.player.state.position,
+        recoveredNative: recovered,
+      ),
+      preventDuplicates: false,
+    );
+  }
+
+  Future<void> _onDecoderTapped() async {
+    final selected = await showPlayerPicker<String>(
+      context: context,
+      title: '解码方式',
+      options: decoderLabels.keys.toList(),
+      current: widget.decoderMode,
+      labelOf: (v) => decoderLabels[v]!,
+    );
+    if (!mounted || selected == null || selected == widget.decoderMode) return;
+    await Settings.setString(Settings.pathDecoderMode, selected);
+    if (mounted) _replaceDecoder(selected);
+  }
+
+  Future<void> _onDefaultQualityTapped() async {
+    final selected = await showPlayerPicker<int>(
+      context: context,
+      title: '进入视频默认画质 · 无对应画质时选较低',
+      options: defaultQualityLabels.keys.toList(),
+      current: _defaultQuality,
+      labelOf: (v) => defaultQualityLabels[v]!,
+    );
+    if (!mounted || selected == null) return;
+    await Settings.setInt(Settings.pathDefaultQuality, selected);
+    setState(() => _defaultQuality = selected);
+  }
+
+  Future<void> _onCodecTapped() async {
+    final selected = await showPlayerPicker<int>(
+      context: context,
+      title: '视频编码偏好 · 不支持时自动回退',
+      options: preferredCodecLabels.keys.toList(),
+      current: _preferredCodec,
+      labelOf: (v) => preferredCodecLabels[v]!,
+    );
+    if (!mounted || selected == null) return;
+    await Settings.setInt(Settings.pathPreferredCodec, selected);
+    setState(() => _preferredCodec = selected);
+    if (_videoReady.value) {
+      await _playDashMedia(
+        _videoPlayURLInfo.dashData,
+        _currentQuality.value!,
+        start: _controller.player.state.position,
+      );
+    }
+  }
+
+  Future<void> _onDanmakuSettingsTapped() async {
+    final action = await showPlayerPicker<int>(
+      context: context,
+      title: '弹幕设置',
+      options: const [0, 1, 2],
+      current: 0,
+      labelOf: (v) => v == 0
+          ? '弹幕：${_danmakuCtl.enabled ? "开" : "关"} · 点击切换'
+          : v == 1
+          ? '弹幕字体大小'
+          : '弹幕屏蔽权重',
+    );
+    if (!mounted || action == null) return;
+    if (action == 0) {
+      _onDanmakuSwitchTapped();
+      return;
+    }
+    final key = action == 1
+        ? Settings.pathDanmuFontSize
+        : Settings.pathDanmuBlockWeightSwitch;
+    final value = await Settings.getInt(key) ?? (action == 1 ? 20 : 6);
+    if (!mounted) return;
+    final selected = await showPlayerPicker<int>(
+      context: context,
+      title: action == 1 ? '弹幕字体大小' : '屏蔽权重 · 越大弹幕越少',
+      options: action == 1
+          ? const [16, 18, 20, 22, 25, 28, 30, 36]
+          : List.generate(11, (i) => i),
+      current: value,
+      labelOf: (v) => '$v',
+    );
+    if (!mounted || selected == null) return;
+    await Settings.setInt(key, selected);
+    await _danmakuCtl.reloadSettings();
   }
 
   String _qualityLabel(Quality? quality) {
     if (quality == null) return '--';
-    if (quality.description.isEmpty) return '${quality.id}P';
+    if (quality.description.isEmpty) {
+      return {
+            120: '4K 超高清',
+            116: '1080P 60帧',
+            112: '1080P 高码率',
+            80: '1080P 高清',
+            74: '720P 60帧',
+            64: '720P 准高清',
+            32: '480P 标清',
+            16: '360P 流畅',
+          }[quality.id] ??
+          '其他画质';
+    }
     return quality.description;
   }
 
@@ -540,10 +957,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       title: '画质·清晰度',
       options: formats,
       current: current,
-      labelOf: _qualityLabel,
+      labelOf: (q) =>
+          _videoPlayURLInfo.dashData.video.any((v) => v.quality == q.id)
+          ? '${_qualityLabel(q)}${q.needsVip ? ' · 大会员' : ''}'
+          : '${_qualityLabel(q)} · 需登录/会员或暂无流',
     );
     if (!mounted || selected == null) return;
     await Settings.setInt(Settings.pathQualitySwitch, selected.id);
+    _autoQuality = false;
     await _onQualityChange(selected);
   }
 
@@ -638,15 +1059,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget _buildVideo() {
     return ValueListenableBuilder<PlayerAspectMode>(
       valueListenable: _aspectMode,
-      builder: (context, mode, _) => Video(
-        controller: _controller,
-        controls: NoVideoControls,
-        fit: switch (mode) {
-          PlayerAspectMode.fit => BoxFit.contain,
-          PlayerAspectMode.fill => BoxFit.fill,
-          PlayerAspectMode.cover => BoxFit.cover,
-        },
-      ),
+      builder: (context, mode, _) => _controller.video(switch (mode) {
+        PlayerAspectMode.fit => BoxFit.contain,
+        PlayerAspectMode.fill => BoxFit.fill,
+        PlayerAspectMode.cover => BoxFit.cover,
+      }),
     );
   }
 
@@ -742,15 +1159,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         kind: PlayerControlKind.audio,
         icon: Icons.music_note_rounded,
         label: '音轨',
-        value: '默认',
-        onSelect: _onUnsupportedTapped,
+        value: _audioLabel(_currentAudio),
+        onSelect: _onAudioTapped,
       ),
       PlayerBarAction(
         kind: PlayerControlKind.danmaku,
         icon: danmakuOn ? IconFont.danmukai : IconFont.danmuguanbi,
-        label: '弹幕',
+        label: '弹幕设置',
         value: danmakuOn ? '开' : '关',
-        onSelect: _onDanmakuSwitchTapped,
+        onSelect: _onDanmakuSettingsTapped,
       ),
       PlayerBarAction(
         kind: PlayerControlKind.aspect,
@@ -778,7 +1195,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   List<PlayerPanelRow> _buildPanelRows() {
     final ready = _videoReady.value;
-    final danmakuOn = _danmakuCtl.enabled;
     return [
       PlayerPanelRow.item(
         kind: PlayerControlKind.quality,
@@ -787,34 +1203,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         value: ready ? _qualityLabel(_currentQuality.value) : '--',
         enabled: ready,
         onSelect: _onQualityTapped,
-      ),
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.rate,
-        icon: Icons.speed_rounded,
-        label: '播放倍速',
-        value: playbackRateString(_playbackRate.value),
-        onSelect: _onRateTapped,
-      ),
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.audio,
-        icon: Icons.music_note_rounded,
-        label: '音轨',
-        value: '默认',
-        onSelect: _onUnsupportedTapped,
-      ),
-      PlayerPanelRow.toggle(
-        kind: PlayerControlKind.danmaku,
-        icon: danmakuOn ? IconFont.danmukai : IconFont.danmuguanbi,
-        label: '弹幕',
-        switchValue: danmakuOn,
-        onSelect: _onDanmakuSwitchTapped,
-      ),
-      const PlayerPanelRow.divider(),
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.danmakuSettings,
-        icon: IconFont.danmushezhi,
-        label: '弹幕设置',
-        onSelect: _onUnsupportedTapped,
       ),
       PlayerPanelRow.item(
         kind: PlayerControlKind.aspect,
@@ -832,10 +1220,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ),
       const PlayerPanelRow.divider(),
       PlayerPanelRow.item(
-        kind: PlayerControlKind.moreSettings,
-        icon: Icons.more_horiz_rounded,
-        label: '更多设置',
-        onSelect: _onMoreSettingsTapped,
+        kind: PlayerControlKind.defaultQuality,
+        icon: Icons.high_quality,
+        label: '进入视频默认画质',
+        value: defaultQualityLabels[_defaultQuality],
+        onSelect: _onDefaultQualityTapped,
+      ),
+      PlayerPanelRow.item(
+        kind: PlayerControlKind.decoder,
+        icon: Icons.memory,
+        label: '解码方式',
+        value: decoderLabels[widget.decoderMode],
+        onSelect: _onDecoderTapped,
+      ),
+      PlayerPanelRow.item(
+        kind: PlayerControlKind.codec,
+        icon: Icons.tune,
+        label: '视频编码偏好',
+        value: preferredCodecLabels[_preferredCodec],
+        onSelect: _onCodecTapped,
       ),
     ];
   }

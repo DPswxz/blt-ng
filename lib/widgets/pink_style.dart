@@ -77,11 +77,7 @@ class _FocusHalo extends StatelessWidget {
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOut,
       builder: (context, progress, child) => CustomPaint(
-        painter: _FocusHaloPainter(
-          progress: progress,
-          ui: ui,
-          radius: radius,
-        ),
+        painter: _FocusHaloPainter(progress: progress, ui: ui, radius: radius),
         child: child,
       ),
       child: child,
@@ -116,7 +112,7 @@ class _FocusHaloPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.7 * halo
-        ..color = biliPink.withValues(alpha: 0.5 * progress)
+        ..color = biliPink.withValues(alpha: 0.25 * progress)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 0.35 * halo),
     );
     // 远处柔光，让选中项"浮"起来
@@ -125,7 +121,7 @@ class _FocusHaloPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0 * halo
-        ..color = biliPink.withValues(alpha: 0.16 * progress)
+        ..color = biliPink.withValues(alpha: 0.08 * progress)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, 0.8 * halo),
     );
   }
@@ -161,6 +157,7 @@ FocusEffectBuilder pinkFocusEffect({
 }
 
 // 可聚焦的小控件底色（浅粉，与页面粉色主题呼应），焦点态由 focusedBackgroundColor 切到白色
+const navigationAccentColor = Color(0xFFC63770);
 const focusableSurfaceColor = Color(0xFFFFF0F6);
 
 // 白色半透明圆角面板
@@ -240,6 +237,8 @@ class PinkButton extends StatelessWidget {
   final VoidCallback onPressed;
   final double height; // 设计尺寸，圆角默认取高度一半
   final bool autofocus;
+  final double fontSize;
+  final double horizontalPadding;
 
   const PinkButton({
     super.key,
@@ -249,6 +248,8 @@ class PinkButton extends StatelessWidget {
     required this.onPressed,
     this.height = 56,
     this.autofocus = false,
+    this.fontSize = 24,
+    this.horizontalPadding = 30,
   });
 
   @override
@@ -260,27 +261,29 @@ class PinkButton extends StatelessWidget {
       child: DpadFocusable(
         autofocus: autofocus,
         onSelect: onPressed,
-        builder: pinkFocusEffect(ui: ui, radius: radius, scale: 1.04),
+        builder: pinkFocusEffect(ui: ui, radius: radius + 3 * ui, scale: 1.02),
         child: Container(
           height: height * ui,
-          padding: EdgeInsets.symmetric(horizontal: 30 * ui),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding * ui),
           decoration: BoxDecoration(
-            gradient: pinkGradient,
+            color: focusableSurfaceColor,
             borderRadius: BorderRadius.circular(radius),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, color: Colors.white, size: 26 * ui),
+                Icon(icon, color: navigationAccentColor, size: 26 * ui),
                 SizedBox(width: 4 * ui),
               ],
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 24 * ui,
+                  fontSize: fontSize * ui,
+                  height: 1.2,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: navigationAccentColor,
                 ),
               ),
             ],
