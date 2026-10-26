@@ -245,12 +245,14 @@ class Stat {
 
 // 剧集信息
 class Episode {
+  final int? episodeId;
   final int index; // 从1开始
   final int cid;
   final String title;
   final Duration duration;
 
   const Episode({
+    this.episodeId,
     required this.index,
     required this.cid,
     required this.title,

@@ -135,12 +135,29 @@ class GetVideoPlayURLResponse {
   factory GetVideoPlayURLResponse.fromJson(Map<String, dynamic> json) {
     return GetVideoPlayURLResponse(
       defaultQualityID: jsonInt(json['quality']),
-      supportFormats: (jsonList(json['support_formats']) ?? const <dynamic>[])
-          .map((item) => jsonMap(item))
-          .whereType<Map<String, dynamic>>()
-          .map(Quality.fromJson)
-          .whereType<Quality>()
-          .toList(),
+      supportFormats:
+          (jsonList(json['support_formats']) ??
+                  [
+                    for (
+                      var i = 0;
+                      i < (jsonList(json['accept_quality']) ?? []).length;
+                      i++
+                    )
+                      {
+                        'quality': jsonList(json['accept_quality'])![i],
+                        'new_description':
+                            i <
+                                (jsonList(json['accept_description']) ?? [])
+                                    .length
+                            ? jsonList(json['accept_description'])![i]
+                            : '',
+                      },
+                  ])
+              .map((item) => jsonMap(item))
+              .whereType<Map<String, dynamic>>()
+              .map(Quality.fromJson)
+              .whereType<Quality>()
+              .toList(),
       dashData: DashData.fromJson(jsonMap(json['dash']) ?? const {}),
     );
   }
@@ -151,6 +168,7 @@ Future<GetVideoPlayURLResponse> getVideoPlayURL({
   int? avid,
   String? bvid,
   required int cid,
+  int? episodeId,
 }) async {
   Map<String, dynamic> queryParams = {'cid': cid, ...webPlayParameters};
   if (avid != null) {
@@ -158,9 +176,12 @@ Future<GetVideoPlayURLResponse> getVideoPlayURL({
   } else {
     queryParams['bvid'] = bvid;
   }
+  if (episodeId != null) queryParams['ep_id'] = episodeId;
   final data = await bilibiliRequest(
     'GET',
-    'https://api.bilibili.com/x/player/wbi/playurl',
+    episodeId == null
+        ? 'https://api.bilibili.com/x/player/wbi/playurl'
+        : 'https://api.bilibili.com/pgc/player/web/playurl',
     queries: queryParams,
   );
   _log.i('获取播放地址 aid=$avid bvid=$bvid cid=$cid');

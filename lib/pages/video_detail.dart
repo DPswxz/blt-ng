@@ -1,6 +1,13 @@
+import 'package:blt/apis/bilibili/library.dart';
+import 'package:blt/widgets/account_dialog.dart' show confirmAccountAction;
 import 'package:blt/widgets/video_comments.dart';
 import 'package:blt/apis/bilibili/media.dart'
-    show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
+    show
+        getVideoInfo,
+        getArchiveRelation,
+        ArchiveRelation,
+        likeMedia,
+        insertCoin;
 import 'package:blt/apis/bilibili/recommend.dart' show fetchRelatedVideos;
 import 'package:blt/apis/bilibili/toview.dart';
 import 'package:blt/apis/bilibili/user.dart'
@@ -154,6 +161,8 @@ class VideoDetailPage extends StatefulWidget {
 }
 
 class _VideoDetailPageState extends State<VideoDetailPage> {
+  bool? _inToView;
+  bool _actionBusy = false;
   late final ValueNotifier<int> _currentEpisodeCid; // 当前分P
   late final VideoGridViewProvider _relatedVideosProvider; // 相关视频提供方
   late final ValueNotifier<bool> _like; // 点赞
@@ -168,6 +177,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
       initVideos: widget.relatedVideos,
     );
     _like = ValueNotifier(widget.relation.like);
+    _loadToViewStatus();
     _following = ValueNotifier(widget.userRelation.following);
     _followerCount = ValueNotifier(widget.followerCount);
   }
@@ -437,7 +447,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   }
 
   Widget _buildRelations(double ui) {
-    // 等宽胶囊按钮：横向 6 格，遥控器左右移动即可，宽度稳定不随数字长度跳动
+    // 等宽胶囊按钮：横向 5 格，遥控器左右移动即可，宽度稳定不随数字长度跳动
     Widget stretch(_RelationAction action) => Expanded(child: action);
 
     return ValueListenableBuilder(
@@ -458,22 +468,11 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
           stretch(
             _RelationAction(
               ui: ui,
-              icon: Icons.thumb_down_rounded,
-              iconScaleX: -1,
-              label: amountString(widget.video.stat.dislikeCount),
-              active: widget.relation.dislike,
-              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
-            ),
-          ),
-          SizedBox(width: 12 * ui),
-          stretch(
-            _RelationAction(
-              ui: ui,
               iconFont: IconFont.coin,
               iconScale: 1.1,
               label: amountString(widget.video.stat.coinCount),
               active: widget.relation.coin > 0,
-              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
+              onPressed: _onCoinTapped,
             ),
           ),
           SizedBox(width: 12 * ui),
@@ -484,7 +483,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
               iconScale: 1.2,
               label: amountString(widget.video.stat.favoriteCount),
               active: widget.relation.favorite,
-              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
+              onPressed: _onFavoriteTapped,
             ),
           ),
           SizedBox(width: 12 * ui),
@@ -503,6 +502,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
               ui: ui,
               iconFont: IconFont.playlist,
               iconScale: 1.1,
+              active: _inToView == true,
               onPressed: _onAddToViewTapped,
             ),
           ),
@@ -524,19 +524,165 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     }
   }
 
+  Future<void> _loadToViewStatus() async {
+    if (!loginInfoNotifier.value.isLogin) return;
+    try {
+      final selected = await isInToView(widget.video.avid);
+      if (mounted) setState(() => _inToView = selected);
+    } catch (_) {
+      /* A failed lookup must not be mistaken for an empty list. */
+    }
+  }
+
+  bool _requireLogin() {
+    if (loginInfoNotifier.value.isLogin) return true;
+    pushTooltipInfo(context, '请先登录！');
+    return false;
+  }
+
   Future<void> _onAddToViewTapped() async {
-    if (!loginInfoNotifier.value.isLogin) {
-      pushTooltipInfo(context, '请先登录！');
+    if (_actionBusy || !_requireLogin()) return;
+    _actionBusy = true;
+    try {
+      final wasAdded = _inToView ?? await isInToView(widget.video.avid);
+      if (wasAdded) {
+        await deleteToView(widget.video.avid);
+      } else {
+        await addToView(avid: widget.video.avid);
+      }
+      if (!mounted) return;
+      setState(() => _inToView = !wasAdded);
+      pushTooltipInfo(context, wasAdded ? '已移出稍后再看' : '已加入稍后再看');
+    } catch (e) {
+      if (mounted) showAppError(context, e);
+    } finally {
+      _actionBusy = false;
+    }
+  }
+
+  Future<int?> _chooseAction(String title, List<String> labels) {
+    final ui = context.ui;
+    return showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 760 * ui,
+          padding: EdgeInsets.all(28 * ui),
+          constraints: BoxConstraints(maxHeight: 800 * ui),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24 * ui),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 30 * ui,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 22 * ui),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (var i = 0; i < labels.length; i++)
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8 * ui),
+                        child: PinkButton(
+                          ui: ui,
+                          label: labels[i],
+                          onPressed: () => Navigator.of(dialogContext).pop(i),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 18 * ui),
+              PinkButton(
+                ui: ui,
+                label: '取消',
+                autofocus: true,
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onCoinTapped() async {
+    if (_actionBusy || !_requireLogin()) return;
+    if (widget.relation.coin >= 2) {
+      pushTooltipInfo(context, '已投 ${widget.relation.coin} 枚硬币，投币后不能撤回');
       return;
     }
-
+    _actionBusy = true;
     try {
-      await addToView(avid: widget.video.avid);
+      final selection = await _chooseAction('投币支持 UP 主', [
+        '投 1 枚硬币',
+        '投 2 枚硬币',
+      ]);
+      if (selection == null || !mounted) return;
+      final count = selection + 1;
+      final confirmed = await confirmAccountAction(
+        context,
+        title: '确认投币？',
+        message: '向该视频投 $count 枚硬币。投币后不能撤回。',
+        confirm: '确认投币',
+      );
+      if (!confirmed || !mounted) return;
+      await insertCoin(avid: widget.video.avid, count: count);
       if (!mounted) return;
-      pushTooltipInfo(context, '已加入稍后再看：${widget.video.title}');
+      setState(() => widget.relation.coin += count);
+      pushTooltipInfo(context, '已投 $count 枚硬币');
     } catch (e) {
+      if (mounted) showAppError(context, e);
+    } finally {
+      _actionBusy = false;
+    }
+  }
+
+  Future<void> _onFavoriteTapped() async {
+    if (_actionBusy || !_requireLogin()) return;
+    _actionBusy = true;
+    try {
+      final folders = await videoFavoriteFolders(
+        loginInfoNotifier.value.mid!,
+        widget.video.avid,
+      );
       if (!mounted) return;
-      showAppError(context, e);
+      if (folders.isEmpty) {
+        pushTooltipInfo(context, '请先在 B 站创建收藏夹');
+        return;
+      }
+      final selected = await _chooseAction('选择收藏夹 · 已收藏可取消', [
+        for (final f in folders) '${f.selected ? '取消收藏' : '添加收藏'} · ${f.title}',
+      ]);
+      if (selected == null || !mounted) return;
+      final folder = folders[selected];
+      await changeVideoFavorite(
+        widget.video.avid,
+        folder.id,
+        add: !folder.selected,
+      );
+      if (!mounted) return;
+      setState(
+        () => widget.relation.favorite =
+            !folder.selected ||
+            folders.any((f) => f.id != folder.id && f.selected),
+      );
+      pushTooltipInfo(context, folder.selected ? '已从该收藏夹移除' : '收藏成功');
+    } catch (e) {
+      if (mounted) showAppError(context, e);
+    } finally {
+      _actionBusy = false;
     }
   }
 
@@ -928,7 +1074,6 @@ class _RelationAction extends StatelessWidget {
   final IconData? icon;
   final IconData? iconFont;
   final double iconScale;
-  final double iconScaleX;
   final String? label;
   final bool active; // 语义上的已选（已点赞/投币/收藏）
   final VoidCallback onPressed;
@@ -938,7 +1083,6 @@ class _RelationAction extends StatelessWidget {
     this.icon,
     this.iconFont,
     this.iconScale = 1,
-    this.iconScaleX = 1,
     this.label,
     this.active = false,
     required this.onPressed,
@@ -952,9 +1096,6 @@ class _RelationAction extends StatelessWidget {
       size: 30 * ui * iconScale,
       color: color,
     );
-    if (iconScaleX != 1) {
-      iconWidget = Transform.scale(scaleX: iconScaleX, child: iconWidget);
-    }
 
     return DpadFocusable(
       onSelect: onPressed,

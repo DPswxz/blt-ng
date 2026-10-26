@@ -132,6 +132,13 @@ void main() {
     testWidgets('未登录时提示先登录且不发请求', (tester) async {
       var requested = false;
       final adapter = mockHttp();
+      adapter.onGet(
+        'https://api.bilibili.com/x/v2/history/toview',
+        (server) => server.reply(200, {
+          'code': 0,
+          'data': {'list': []},
+        }),
+      );
       adapter.onPost(
         _toViewAddUrl,
         data: Matchers.any,
@@ -155,6 +162,13 @@ void main() {
         'bilibili_cookie': 'bili_jct=csrf-token',
       });
       final adapter = mockHttp();
+      adapter.onGet(
+        'https://api.bilibili.com/x/v2/history/toview',
+        (server) => server.reply(200, {
+          'code': 0,
+          'data': {'list': []},
+        }),
+      );
       adapter.onPost(
         _toViewAddUrl,
         data: Matchers.any,
@@ -165,7 +179,7 @@ void main() {
       await selectFocusable(tester, find.byIcon(IconFont.playlist));
       await flush(tester);
 
-      expect(find.text('提示：已加入稍后再看：测试视频标题'), findsOneWidget);
+      expect(find.text('提示：已加入稍后再看'), findsOneWidget);
     });
   });
 

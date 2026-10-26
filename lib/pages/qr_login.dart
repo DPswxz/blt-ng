@@ -2,24 +2,24 @@ import 'dart:async';
 
 import 'package:blt/apis/bilibili/auth.dart';
 import 'package:blt/apis/bilibili/user.dart';
-import 'package:blt/storages/auth.dart'
-    show saveCookie, loginInfoNotifier, LoginInfo;
+import 'package:blt/storages/auth.dart' show saveSignedInAccount;
 import 'package:blt/utils/ui_scale.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-Future<bool?> showQrLoginDialog(BuildContext context) {
+Future<bool?> showQrLoginDialog(BuildContext context, {bool addOnly = false}) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const _QrLoginDialog(),
+    builder: (_) => _QrLoginDialog(addOnly: addOnly),
   );
 }
 
 class _QrLoginDialog extends StatelessWidget {
-  const _QrLoginDialog();
+  final bool addOnly;
+  const _QrLoginDialog({required this.addOnly});
 
   @override
   Widget build(BuildContext context) {
@@ -32,14 +32,15 @@ class _QrLoginDialog extends StatelessWidget {
           color: Theme.of(context).canvasColor,
           borderRadius: BorderRadius.circular(16 * ui),
         ),
-        child: const _QrLoginWidget(),
+        child: _QrLoginWidget(addOnly: addOnly),
       ),
     );
   }
 }
 
 class _QrLoginWidget extends StatefulWidget {
-  const _QrLoginWidget();
+  final bool addOnly;
+  const _QrLoginWidget({required this.addOnly});
 
   @override
   State<_QrLoginWidget> createState() => _QrLoginWidgetState();
@@ -133,12 +134,12 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
     _pollTimer?.cancel();
 
     try {
-      await saveCookie(status.cookies, refreshToken: status.refreshToken ?? '');
-      final info = await getMySelfInfo();
-      loginInfoNotifier.value = LoginInfo.login(
-        mid: info.mid,
-        nickname: info.name,
-        avatar: info.avatar,
+      final info = await getMySelfInfo(cookies: status.cookies);
+      await saveSignedInAccount(
+        info.loginProfile,
+        status.cookies,
+        refreshToken: status.refreshToken ?? '',
+        activate: !widget.addOnly,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);

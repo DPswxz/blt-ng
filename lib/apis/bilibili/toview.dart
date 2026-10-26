@@ -51,3 +51,14 @@ Future<void> deleteToView(int avid) async {
     body: {'aid': avid, 'csrf': csrf},
   );
 }
+
+// The complete list endpoint includes watched entries and supports membership checks.
+Future<bool> isInToView(int avid) async {
+  final data = await bilibiliRequest(
+    'GET',
+    'https://api.bilibili.com/x/v2/history/toview',
+  );
+  return (jsonList(jsonMap(data)?['list']) ?? []).any(
+    (v) => jsonInt(jsonMap(v)?['aid']) == avid,
+  );
+}

@@ -1,5 +1,5 @@
 import 'package:blt/apis/bilibili/error.dart';
-import 'package:blt/storages/auth.dart' show loadCookie;
+import 'package:blt/storages/auth.dart' show loadCookie, authSessionVersion;
 import 'package:blt/utils/json.dart';
 import 'package:blt/utils/log.dart';
 import 'package:dio/dio.dart';
@@ -33,7 +33,8 @@ final Dio bilibiliHttpClient = () {
     InterceptorsWrapper(
       onRequest: (options, handler) async {
         final cookies = await loadCookie();
-        if (cookies.isNotEmpty) {
+        if (cookies.isNotEmpty &&
+            !options.headers.keys.any((k) => k.toLowerCase() == 'cookie')) {
           options.headers['Cookie'] = cookies.join('; ');
         }
         return handler.next(options);
@@ -53,6 +54,9 @@ Future<dynamic> bilibiliRequest<T>(
   Map<String, dynamic>? headers,
   Object? body,
 }) async {
+  final generation = authSessionVersion;
+  final sessionBound =
+      !(headers?.keys.any((k) => k.toLowerCase() == 'cookie') ?? false);
   final Response<dynamic> response;
   try {
     response = await bilibiliHttpClient.request(
@@ -68,6 +72,9 @@ Future<dynamic> bilibiliRequest<T>(
   } on DioException catch (e) {
     _log.w('请求失败 $method $url [${e.type.name}] ${e.message}');
     rethrow;
+  }
+  if (sessionBound && generation != authSessionVersion) {
+    throw const BilibiliError(-2, '账号已切换，请重试');
   }
   if (response.statusCode != 200) {
     _log.w('HTTP错误 $method $url status=${response.statusCode}');
@@ -100,5 +107,5 @@ Future<dynamic> bilibiliRequest<T>(
     _log.w('业务错误 $method $url code=$code msg=$message');
     throw BilibiliError(code, message.isNotEmpty ? message : '未知错误');
   }
-  return respData['data'];
+  return respData['data'] ?? respData['result'];
 }

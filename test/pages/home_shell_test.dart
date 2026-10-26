@@ -29,9 +29,26 @@ void main() {
     await pumpPage(tester, const app.Page());
     await flush(tester);
 
-    for (final label in ['我的', '搜索', '历史', '动态', '稍后再看', '首页', '设置']) {
+    for (final label in ['首页', '搜索', '历史', '动态', '设置']) {
       expect(find.text(label), findsOneWidget, reason: '缺少入口：$label');
     }
+    expect(find.text('我的'), findsNothing);
+    final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    expect(sidebar.items.first.label, '首页');
+    expect(find.text('推荐视频A'), findsOneWidget);
+  });
+
+  testWidgets('头像打开个人页面并保留侧栏，返回首页', (tester) async {
+    mockRecommend();
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    tester.widget<Sidebar>(find.byType(Sidebar)).onAvatarTap();
+    await flush(tester);
+    expect(find.text('登录后查看追番追剧、收藏夹和稍后再看'), findsOneWidget);
+    expect(find.text('账号管理'), findsOneWidget);
+    expect(find.byType(Sidebar), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     expect(find.text('推荐视频A'), findsOneWidget);
   });
 

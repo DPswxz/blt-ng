@@ -1,6 +1,7 @@
 import 'package:blt/apis/bilibili/client.dart';
 import 'package:blt/apis/bilibili/error.dart';
-import 'package:blt/storages/auth.dart' show loadCookie;
+import 'package:blt/storages/auth.dart' show loadCookie, LoginInfo;
+import 'dart:io';
 import 'package:blt/utils/json.dart';
 import 'package:dio/dio.dart' show Headers;
 
@@ -26,6 +27,18 @@ class UserInfo {
 class MySelf extends UserInfo {
   final int level;
   final int money;
+  final int vipType, vipStatus, vipDueDate;
+  final String vipLabel;
+  LoginInfo get loginProfile => LoginInfo.login(
+    mid: mid,
+    nickname: name,
+    avatar: avatar,
+    level: level,
+    vipType: vipType,
+    vipStatus: vipStatus,
+    vipDueDate: vipDueDate,
+    vipLabel: vipLabel,
+  );
 
   MySelf({
     required super.mid,
@@ -33,6 +46,10 @@ class MySelf extends UserInfo {
     required super.avatar,
     required this.level,
     required this.money,
+    this.vipType = 0,
+    this.vipStatus = 0,
+    this.vipDueDate = 0,
+    this.vipLabel = '',
   });
 
   // 核心字段（mid）缺失时返回 null，由调用方转为可读错误
@@ -46,14 +63,33 @@ class MySelf extends UserInfo {
       avatar: jsonString(json['face']),
       level: jsonInt(levelInfo['current_level']),
       money: jsonInt(json['money']),
+      vipType: jsonInt(
+        json['vipType'],
+        fallback: jsonInt(jsonMap(json['vip'])?['type']),
+      ),
+      vipStatus: jsonInt(
+        json['vipStatus'],
+        fallback: jsonInt(jsonMap(json['vip'])?['status']),
+      ),
+      vipDueDate: jsonInt(
+        json['vipDueDate'],
+        fallback: jsonInt(jsonMap(json['vip'])?['due_date']),
+      ),
+      vipLabel: jsonString(
+        jsonMap(json['vip_label'])?['text'],
+        fallback: jsonString(jsonMap(jsonMap(json['vip'])?['label'])?['text']),
+      ),
     );
   }
 }
 
-Future<MySelf> getMySelfInfo() async {
+Future<MySelf> getMySelfInfo({List<Cookie>? cookies}) async {
   final data = await bilibiliRequest(
     'GET',
     'https://api.bilibili.com/x/web-interface/nav',
+    headers: cookies == null
+        ? null
+        : {'Cookie': cookies.map((c) => '${c.name}=${c.value}').join('; ')},
   );
   final info = MySelf.fromJson(jsonMap(data) ?? const {});
   if (info == null) {

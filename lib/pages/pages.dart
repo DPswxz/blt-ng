@@ -2,11 +2,9 @@ import 'package:blt/consts/color.dart';
 import 'package:blt/icons/iconfont.dart';
 import 'package:blt/pages/dynamic.dart';
 import 'package:blt/pages/history.dart';
-import 'package:blt/pages/qr_login.dart';
 import 'package:blt/pages/recommend.dart';
 import 'package:blt/pages/search.dart';
 import 'package:blt/pages/setting.dart';
-import 'package:blt/pages/to_view.dart';
 import 'package:blt/pages/user_info.dart';
 import 'package:blt/storages/auth.dart';
 import 'package:blt/utils/ui_scale.dart';
@@ -62,11 +60,12 @@ class _PageState extends State<Page> {
     super.initState();
     _tabs = [
       _PageItem(
-        icon: Icons.account_circle_rounded,
-        label: '我的',
-        child: (listener) => UserInfoPage(refreshListener: listener),
-        needLogin: true,
+        icon: Icons.home_rounded,
+        label: '首页',
+        child: (listener) => RecommendPage(listener),
+        homePage: true,
       ),
+
       _PageItem(
         icon: IconFont.search,
         label: '搜索',
@@ -86,21 +85,14 @@ class _PageState extends State<Page> {
         needLogin: true,
       ),
       _PageItem(
-        icon: IconFont.playlist,
-        label: '稍后再看',
-        child: (listener) => ToViewPage(listener),
-        needLogin: true,
-      ),
-      _PageItem(
-        icon: Icons.home_rounded,
-        label: '首页',
-        child: (listener) => RecommendPage(listener),
-        homePage: true,
-      ),
-      _PageItem(
         icon: Icons.settings_rounded,
         label: '设置',
         child: (listener) => SettingPage(refreshListener: listener),
+      ),
+      _PageItem(
+        icon: Icons.account_circle_rounded,
+        label: '我的',
+        child: (listener) => UserInfoPage(refreshListener: listener),
       ),
     ];
     _pageFocusNodes = _tabs.map((e) => FocusNode()).toList();
@@ -132,48 +124,21 @@ class _PageState extends State<Page> {
 
     final index = _tabs.indexOf(tab);
     if (_currentPageIndex.value != index) {
-      if (tab.child is SettingPage) tab.onTappedListener.value++;
+      if (tab.child is SettingPage || tab.child is UserInfoPage) {
+        tab.onTappedListener.value++;
+      }
       _currentPageIndex.value = index;
     } else {
       tab.onTappedListener.value = DateTime.now().microsecondsSinceEpoch;
     }
   }
 
-  DateTime _lastTapAvatarTime = DateTime.fromMillisecondsSinceEpoch(0);
-
-  Future<void> _onAvatarTapped() async {
-    if (!loginInfoNotifier.value.isLogin) {
-      showQrLoginDialog(context);
-      return;
-    }
-
-    final now = DateTime.now();
-    final diff = now.difference(_lastTapAvatarTime);
-    if (diff < Duration(milliseconds: 600)) {
-      await _onDoublePressAvatar();
-    } else {
-      pushTooltipInfo(context, "再次点击头像退出当前账号！");
-    }
-    _lastTapAvatarTime = now;
-  }
-
-  Future<void> _onDoublePressAvatar() async {
-    if (!loginInfoNotifier.value.isLogin) return;
-    // 先清除持久化信息，失败则保持登录状态，避免状态不一致
-    try {
-      await clearCookie();
-    } catch (_) {
-      return;
-    }
-    if (!mounted) return;
-    loginInfoNotifier.value = LoginInfo.notLogin;
-    pushTooltipInfo(context, "已退出当前账号！");
-  }
+  void _onAvatarTapped() => _onTabTapped(_tabs.last);
 
   Future<void> _handleBack() async {
     if (_exitDialogOpen) return;
     final home = _tabs.lastIndexWhere((tab) => tab.homePage);
-    if (_currentPageIndex.value == 1 &&
+    if (_tabs[_currentPageIndex.value].child is SearchPage &&
         (_searchKey.currentState?.dismissInput() ?? false)) {
       return;
     }
@@ -259,7 +224,7 @@ class _PageState extends State<Page> {
                     ),
                   ),
                   items: [
-                    for (var i = 0; i < _tabs.length; i++)
+                    for (var i = 0; i < _tabs.length - 1; i++)
                       SidebarItemData(
                         icon: _tabs[i].icon,
                         label: _tabs[i].label,

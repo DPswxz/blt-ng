@@ -23,9 +23,14 @@ Widget _host() => UiScale(
 
 // 等待 splash 的登录校验与 500ms 延迟后完成跳转
 Future<void> _waitSplash(WidgetTester tester) async {
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 600));
-  await tester.pump();
+  for (
+    var i = 0;
+    i < 25 && find.text('home-placeholder').evaluate().isEmpty;
+    i++
+  ) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -40,9 +45,7 @@ void main() {
   });
 
   testWidgets('登录态校验成功写入登录信息', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'bilibili_cookie': 'SESSDATA=abc',
-    });
+    SharedPreferences.setMockInitialValues({'bilibili_cookie': 'SESSDATA=abc'});
     mockHttp().onGet(
       _navUrl,
       (server) => server.reply(200, {
@@ -65,9 +68,7 @@ void main() {
   });
 
   testWidgets('cookie 失效（-101）时清除本地登录信息', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'bilibili_cookie': 'SESSDATA=abc',
-    });
+    SharedPreferences.setMockInitialValues({'bilibili_cookie': 'SESSDATA=abc'});
     mockHttp().onGet(
       _navUrl,
       (server) => server.reply(200, {'code': -101, 'message': '账号未登录'}),
@@ -82,14 +83,16 @@ void main() {
   });
 
   testWidgets('登录校验网络异常时不崩溃并继续进入主页', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      'bilibili_cookie': 'SESSDATA=abc',
-    });
+    SharedPreferences.setMockInitialValues({'bilibili_cookie': 'SESSDATA=abc'});
     mockHttp().onGet(
       _navUrl,
-      (server) => server.reply(200, '<html>风控</html>', headers: {
-        'content-type': ['text/html'],
-      }),
+      (server) => server.reply(
+        200,
+        '<html>风控</html>',
+        headers: {
+          'content-type': ['text/html'],
+        },
+      ),
     );
 
     await tester.pumpWidget(_host());

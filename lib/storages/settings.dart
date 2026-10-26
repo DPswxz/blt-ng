@@ -16,6 +16,8 @@ class Settings {
     'danmu',
     'block_weight',
   ];
+  static const pathDanmuArea = ['setting', 'danmu', 'area'];
+  static const pathDanmuTransparency = ['setting', 'danmu', 'transparency'];
   static const pathDanmuFontSize = ['setting', 'danmu', 'font_size'];
   static const pathQualitySwitch = ['setting', 'player', 'quality'];
   static const pathPlaybackRateSwitch = ['setting', 'player', 'playback_rate'];

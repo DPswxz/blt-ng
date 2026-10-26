@@ -20,7 +20,7 @@ try {
         $uri='file:///'+($gradleZip -replace '\\','/')
         [IO.File]::WriteAllText($wrapper,($oldWrapper -replace 'distributionUrl=.*',"distributionUrl=$uri"))
     }
-    & $flutter build apk --release --split-per-abi --target-platform android-arm --build-name 0.12.1 --build-number 1010
+    & $flutter build apk --release --split-per-abi --target-platform android-arm --build-name 0.12.1 --build-number 1016
     if($LASTEXITCODE -ne 0){throw 'APK build failed'}
     Write-Output (Join-Path $PSScriptRoot 'build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk')
 } finally {

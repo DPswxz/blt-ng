@@ -8,6 +8,15 @@ import 'package:blt/utils/ui_scale.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:flutter/material.dart';
 
+const danmakuAreaLabels = {
+  5: '顶部 5%',
+  10: '顶部 10%',
+  25: '顶部 25%',
+  50: '顶部 50%',
+};
+String danmakuTransparencyLabel(int value) =>
+    value == 0 ? '0%（不透明）' : '$value%';
+
 class BilibiliDanmakuWallController {
   // 弹幕墙就绪前为空，此时所有操作均为空操作
   DanmakuController? _controller;
@@ -72,6 +81,8 @@ class BilibiliDanmakuWall extends StatefulWidget {
 class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   int _danmuBlockWeight = 6;
   double _danmuFontSize = 20;
+  int _danmuArea = 10;
+  int _transparency = 0;
   bool _initDone = false;
   bool _pullDanmaku = false;
   DateTime? _lastPullFailTime;
@@ -136,12 +147,20 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     try {
       final weight = await Settings.getInt(Settings.pathDanmuBlockWeightSwitch);
       final fontSize = await Settings.getInt(Settings.pathDanmuFontSize);
+      final area = await Settings.getInt(Settings.pathDanmuArea) ?? 10;
+      final transparency =
+          await Settings.getInt(Settings.pathDanmuTransparency) ?? 0;
       if (!mounted) return;
+      final newArea = danmakuAreaLabels.containsKey(area) ? area : 10;
+      if (_danmuArea != newArea) widget.controller.clearDanmaku();
       setState(() {
+        _danmuArea = newArea;
+        _transparency = transparency.clamp(0, 90);
         _danmuBlockWeight = weight ?? 6;
         _danmuFontSize = (fontSize ?? 20).toDouble();
         _initDone = true;
       });
+      widget.controller._controller?.updateOption(_option(context.ui));
     } catch (_) {
       // 读取设置失败时使用默认值，保证弹幕仍可展示
       if (!mounted) return;
@@ -282,16 +301,30 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     _beginTime = DateTime.now().add(duration);
   }
 
+  DanmakuOption _option(double ui) => DanmakuOption(
+    fontSize: _danmuFontSize * ui,
+    opacity: 1 - _transparency / 100,
+  );
+
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
     if (!_initDone) {
       return const SizedBox();
     }
-    return DanmakuScreen(
-      createdController: (c) => widget.controller._controller = c,
-      // 设置里的字号以1080p为基准，随屏幕缩放
-      option: DanmakuOption(fontSize: _danmuFontSize * ui),
+    // Size the entire canvas so fixed bottom comments also stay in the chosen region.
+    return Align(
+      alignment: Alignment.topCenter,
+      child: FractionallySizedBox(
+        widthFactor: 1,
+        heightFactor: _danmuArea / 100,
+        child: ClipRect(
+          child: DanmakuScreen(
+            createdController: (c) => widget.controller._controller = c,
+            option: _option(ui),
+          ),
+        ),
+      ),
     );
   }
 }

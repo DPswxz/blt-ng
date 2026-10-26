@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 void pushTooltipInfo(
   BuildContext context,
   String text, {
-  Duration duration = const Duration(milliseconds: 500),
+  Duration duration = const Duration(seconds: 4),
 }) {
   final ui = context.ui;
   ScaffoldMessenger.of(context)
@@ -33,7 +33,9 @@ void pushTooltipInfo(
             ),
           ],
         ),
-        duration: duration,
+        duration: duration < const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : duration,
       ),
     );
 }
@@ -41,7 +43,7 @@ void pushTooltipInfo(
 void pushTooltipWarning(
   BuildContext context,
   String text, {
-  Duration duration = const Duration(milliseconds: 500),
+  Duration duration = const Duration(seconds: 4),
 }) {
   final ui = context.ui;
   ScaffoldMessenger.of(context)
@@ -69,7 +71,9 @@ void pushTooltipWarning(
             ),
           ],
         ),
-        duration: duration,
+        duration: duration < const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : duration,
       ),
     );
 }
@@ -77,7 +81,7 @@ void pushTooltipWarning(
 void pushTooltipError(
   BuildContext context,
   String text, {
-  Duration duration = const Duration(seconds: 4),
+  Duration duration = const Duration(seconds: 6),
   VoidCallback? onRetry,
 }) {
   final ui = context.ui;
@@ -113,7 +117,9 @@ void pushTooltipError(
                 textColor: Colors.white,
                 onPressed: onRetry,
               ),
-        duration: duration,
+        duration: duration < const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : duration,
       ),
     );
 }
@@ -150,7 +156,9 @@ void pushTooltipFatal(
             ),
           ],
         ),
-        duration: duration,
+        duration: duration < const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : duration,
       ),
     );
 }

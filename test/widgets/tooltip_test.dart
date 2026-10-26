@@ -27,6 +27,26 @@ Future<BuildContext> _pumpContext(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('信息提示至少4秒，显式更长时间保留，连续提示立即替换', (tester) async {
+    final context = await _pumpContext(tester);
+    pushTooltipInfo(context, '第一条');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<SnackBar>(find.byType(SnackBar)).duration,
+      const Duration(seconds: 4),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('提示：第一条'), findsOneWidget);
+    pushTooltipInfo(context, '第二条', duration: const Duration(seconds: 7));
+    await tester.pumpAndSettle();
+    expect(find.text('提示：第二条'), findsOneWidget);
+    expect(find.text('提示：第一条'), findsNothing);
+    expect(
+      tester.widget<SnackBar>(find.byType(SnackBar)).duration,
+      const Duration(seconds: 7),
+    );
+  });
+
   testWidgets('预期内错误（业务码）走普通错误提示', (tester) async {
     final context = await _pumpContext(tester);
 
@@ -35,7 +55,7 @@ void main() {
 
     expect(find.text('错误：账号未登录'), findsOneWidget);
     final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.duration, const Duration(seconds: 4));
+    expect(snackBar.duration, const Duration(seconds: 6));
     expect(snackBar.action, isNull);
   });
 

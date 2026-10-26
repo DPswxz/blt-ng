@@ -36,6 +36,7 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   static Future<void> _checkLogin() async {
+    await restoreSavedLogin();
     final cookies = await loadCookie();
     if (cookies.isEmpty) {
       return;
@@ -44,11 +45,7 @@ class _SplashPageState extends State<SplashPage> {
     try {
       // 获取用户信息
       final info = await getMySelfInfo();
-      loginInfoNotifier.value = LoginInfo.login(
-        mid: info.mid,
-        nickname: info.name,
-        avatar: info.avatar,
-      );
+      await rememberCurrentAccount(info.loginProfile);
     } on BilibiliError catch (e) {
       if (e == BilibiliError.notLoggedIn) {
         await clearCookie();

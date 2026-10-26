@@ -1,3 +1,4 @@
+import 'package:blt/widgets/danmaku_settings.dart';
 import 'dart:async';
 import 'package:blt/utils/playback_policy.dart';
 import 'package:blt/utils/log.dart';
@@ -375,7 +376,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (_displayControl.value) return;
 
     final now = DateTime.now();
-    if (_lastBackTime != null && now.difference(_lastBackTime!).inSeconds < 2) {
+    if (_lastBackTime != null && now.difference(_lastBackTime!).inSeconds < 4) {
       // 上报播放进度
       if (loginInfoNotifier.value.isLogin) {
         reportPlayProgress(
@@ -391,7 +392,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     pushTooltipInfo(
       context,
       '再按一次返回退出播放',
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 4),
     );
   }
 
@@ -437,7 +438,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         if (!mounted || cid != _currentCid.value) return;
       }
 
-      final info = await getVideoPlayURL(avid: widget.video.avid, cid: cid);
+      final info = await getVideoPlayURL(
+        avid: widget.video.avid,
+        cid: cid,
+        episodeId: widget.video.episodes
+            .where((e) => e.cid == cid)
+            .firstOrNull
+            ?.episodeId,
+      );
       if (!mounted || cid != _currentCid.value) return;
       if (info.supportFormats.isEmpty) {
         throw Exception('该视频暂无可播放清晰度');
@@ -892,41 +900,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
-  Future<void> _onDanmakuSettingsTapped() async {
-    final action = await showPlayerPicker<int>(
-      context: context,
-      title: '弹幕设置',
-      options: const [0, 1, 2],
-      current: 0,
-      labelOf: (v) => v == 0
-          ? '弹幕：${_danmakuCtl.enabled ? "开" : "关"} · 点击切换'
-          : v == 1
-          ? '弹幕字体大小'
-          : '弹幕屏蔽权重',
-    );
-    if (!mounted || action == null) return;
-    if (action == 0) {
-      _onDanmakuSwitchTapped();
-      return;
-    }
-    final key = action == 1
-        ? Settings.pathDanmuFontSize
-        : Settings.pathDanmuBlockWeightSwitch;
-    final value = await Settings.getInt(key) ?? (action == 1 ? 20 : 6);
-    if (!mounted) return;
-    final selected = await showPlayerPicker<int>(
-      context: context,
-      title: action == 1 ? '弹幕字体大小' : '屏蔽权重 · 越大弹幕越少',
-      options: action == 1
-          ? const [16, 18, 20, 22, 25, 28, 30, 36]
-          : List.generate(11, (i) => i),
-      current: value,
-      labelOf: (v) => '$v',
-    );
-    if (!mounted || selected == null) return;
-    await Settings.setInt(key, selected);
-    await _danmakuCtl.reloadSettings();
-  }
+  Future<void> _onDanmakuSettingsTapped() => showDanmakuSettings(
+    context,
+    _danmakuCtl,
+    onToggle: _onDanmakuSwitchTapped,
+  );
 
   String _qualityLabel(Quality? quality) {
     if (quality == null) return '--';

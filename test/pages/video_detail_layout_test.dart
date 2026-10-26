@@ -108,12 +108,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('6 个操作按钮均为可聚焦胶囊', (tester) async {
+  testWidgets('5 个操作按钮均为可聚焦胶囊', (tester) async {
     await _pumpDetail(tester);
 
     for (final icon in [
       Icons.thumb_up_rounded,
-      Icons.thumb_down_rounded,
       IconFont.coin,
       Icons.star_rounded,
       IconFont.playlist,
