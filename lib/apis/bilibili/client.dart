@@ -1,3 +1,5 @@
+import 'package:blt/utils/request_scope.dart';
+import 'dart:io' show SocketException;
 import 'package:blt/apis/bilibili/error.dart';
 import 'package:blt/storages/auth.dart' show loadCookie, authSessionVersion;
 import 'package:blt/utils/json.dart';
@@ -68,9 +70,18 @@ Future<dynamic> bilibiliRequest<T>(
       ),
       queryParameters: queries,
       data: body,
+      cancelToken: currentRequestToken,
     );
   } on DioException catch (e) {
-    _log.w('请求失败 $method $url [${e.type.name}] ${e.message}');
+    if (!CancelToken.isCancel(e)) {
+      _log.w('请求失败 $method $url [${e.type.name}] ${e.message}');
+      final cause = e.error;
+      if (cause is SocketException) {
+        _log.w(
+          '网络连接失败：${cause.osError?.message ?? cause.message} (errno=${cause.osError?.errorCode})',
+        );
+      }
+    }
     rethrow;
   }
   if (sessionBound && generation != authSessionVersion) {

@@ -12,21 +12,19 @@ const _searchUrl = 'https://api.bilibili.com/x/web-interface/wbi/search/type';
 const _hotUrl = 'https://api.bilibili.com/x/web-interface/wbi/search/square';
 const _suggestUrl = 'https://s.search.bilibili.com/main/suggest';
 
-Map<String, dynamic> _searchItem({
-  int aid = 170001,
-  String title = '搜索结果视频',
-}) => {
-  'type': 'video',
-  'aid': aid,
-  'bvid': 'BV$aid',
-  'title': title,
-  'pic': '//i0.hdslb.com/cover.jpg',
-  'duration': '10:30',
-  'mid': 123,
-  'author': '测试UP主',
-  'upic': '//i0.hdslb.com/face.jpg',
-  'pubdate': 1700000000,
-};
+Map<String, dynamic> _searchItem({int aid = 170001, String title = '搜索结果视频'}) =>
+    {
+      'type': 'video',
+      'aid': aid,
+      'bvid': 'BV$aid',
+      'title': title,
+      'pic': '//i0.hdslb.com/cover.jpg',
+      'duration': '10:30',
+      'mid': 123,
+      'author': '测试UP主',
+      'upic': '//i0.hdslb.com/face.jpg',
+      'pubdate': 1700000000,
+    };
 
 void _login() {
   loginInfoNotifier.value = LoginInfo.login(
@@ -74,7 +72,9 @@ void _mockHotWords(DioAdapter adapter, List<String> words) {
       'code': 0,
       'data': {
         'trending': {
-          'list': [for (final word in words) {'keyword': word}],
+          'list': [
+            for (final word in words) {'keyword': word},
+          ],
         },
       },
     }),
@@ -87,13 +87,17 @@ void _mockSuggest(DioAdapter adapter, List<String> words) {
     (server) => server.reply(200, {
       'code': 0,
       'result': {
-        'tag': [for (final word in words) {'value': word}],
+        'tag': [
+          for (final word in words) {'value': word},
+        ],
       },
     }),
   );
 }
 
 Future<void> _search(WidgetTester tester, String keyword) async {
+  await tester.tap(find.byType(TextField));
+  await tester.pump();
   await tester.enterText(find.byType(TextField), keyword);
   await tester.testTextInput.receiveAction(TextInputAction.done);
   await flush(tester);
@@ -237,6 +241,8 @@ void main() {
     await pumpPage(tester, const SearchPage());
     await flush(tester);
 
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
     await tester.enterText(find.byType(TextField), '洛');
     await tester.pump(const Duration(milliseconds: 300));
     await flush(tester);
@@ -291,6 +297,8 @@ void main() {
     await pumpPage(tester, const SearchPage());
     await flush(tester);
 
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
     await tester.enterText(find.byType(TextField), '洛');
     await tester.pump(const Duration(milliseconds: 300));
     await flush(tester);
@@ -308,6 +316,51 @@ void main() {
     await tester.pump();
 
     expect(find.text('洛天依'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('选中输入框不弹键盘，确认编辑，返回后方向键可离开且无清空按钮', (tester) async {
+    _login();
+    final adapter = mockHttp();
+    _mockSearch(adapter);
+    _mockHotWords(adapter, ['热搜甲']);
+    final key = GlobalKey<SearchPageState>();
+    await pumpPage(tester, SearchPage(key: key));
+    await flush(tester);
+    var input = tester.widget<TextField>(find.byType(TextField));
+    input.focusNode!.requestFocus();
+    await tester.pump();
+    expect(input.readOnly, isTrue);
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    await tester.pump();
+    input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.readOnly, isFalse);
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(input.decoration?.suffixIcon, isNull);
+    expect(key.currentState!.dismissInput(), isTrue);
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(input.focusNode!.hasFocus, isFalse);
+    input.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(input.focusNode!.hasFocus, isFalse);
+    input.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    await tester.pump();
+    // Some TV IMEs hide without reporting viewInsets or a Flutter back event.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    expect(input.focusNode!.hasFocus, isFalse);
     expect(tester.takeException(), isNull);
   });
 

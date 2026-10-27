@@ -37,6 +37,8 @@ void main() {
       );
       await flush(tester);
       expect(find.text('这是第一条评论'), findsOneWidget);
+      expect(find.text('踩'), findsNothing);
+      expect(find.byIcon(Icons.thumb_down_alt_outlined), findsNothing);
       expect(tester.takeException(), isNull);
     }
   });
@@ -49,6 +51,7 @@ void main() {
     await tester.tap(find.text('全文 · 1 回复'));
     await tester.pumpAndSettle();
     expect(find.text('回复 @一级用户：二级评论'), findsOneWidget);
+    expect(find.text('踩'), findsNothing);
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.text('回复 @一级用户：二级评论'), findsNothing);

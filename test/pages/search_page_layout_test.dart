@@ -75,6 +75,8 @@ Future<void> _pump(WidgetTester tester, {required Size size}) async {
 }
 
 Future<void> _search(WidgetTester tester, String keyword) async {
+  await tester.tap(find.byType(TextField));
+  await tester.pump();
   await tester.enterText(find.byType(TextField), keyword);
   await tester.testTextInput.receiveAction(TextInputAction.done);
   await flush(tester);
@@ -122,11 +124,7 @@ void main() {
     for (final size in _sizes) {
       await _pump(tester, size: size);
       await _search(tester, '没有结果的词');
-      expect(
-        find.text('没有找到「没有结果的词」相关视频'),
-        findsOneWidget,
-        reason: '$size',
-      );
+      expect(find.text('没有找到「没有结果的词」相关视频'), findsOneWidget, reason: '$size');
       expect(tester.takeException(), isNull, reason: '$size 下空态不应溢出');
     }
 

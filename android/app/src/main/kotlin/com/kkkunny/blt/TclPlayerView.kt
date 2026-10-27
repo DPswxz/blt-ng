@@ -48,7 +48,7 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
         .setLoadControl(DefaultLoadControl.Builder()
             .setBufferDurationsMs(15000, 45000, 1000, 2000)
             .setTargetBufferBytes(32 * 1024 * 1024)
-            .setPrioritizeTimeOverSizeThresholds(true).build())
+            .setPrioritizeTimeOverSizeThresholds(false).build())
         .build()
     private val ticker = object : Runnable {
         override fun run() {

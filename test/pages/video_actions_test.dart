@@ -58,6 +58,7 @@ void main() {
     await saveCookie([
       Cookie('DedeUserID', '1'),
       Cookie('bili_jct', 'fake-csrf'),
+      Cookie('buvid3', 'test-browser-id'),
     ]);
     await pumpPage(
       tester,
@@ -106,7 +107,7 @@ void main() {
     await flush(t);
     expect(active(t, IconFont.playlist), isTrue);
   });
-  testWidgets('投币必须二次确认，取消不提交，成功后高亮且保留数量', (t) async {
+  testWidgets('投币入口仅提示功能暂未开放，不提交请求或打开确认框', (t) async {
     final http = mockHttp();
     var calls = 0;
     http.onGet(
@@ -127,26 +128,12 @@ void main() {
     final relation = ArchiveRelation();
     await load(t, relation);
     await selectFocusable(t, find.byIcon(IconFont.coin));
-    await t.pumpAndSettle();
-    await t.tap(find.text('投 2 枚硬币'));
-    await t.pumpAndSettle();
-    expect(find.text('确认投币？'), findsOneWidget);
-    await t.tap(find.text('取消'));
-    await t.pumpAndSettle();
+    await flush(t);
+    expect(find.textContaining('功能暂未开放'), findsOneWidget);
+    expect(find.text('确认投币？'), findsNothing);
+    expect(find.text('投 1 枚硬币'), findsNothing);
     expect(calls, 0);
     expect(relation.coin, 0);
-    await selectFocusable(t, find.byIcon(IconFont.coin));
-    await t.pumpAndSettle();
-    await t.tap(find.text('投 2 枚硬币'));
-    await t.pumpAndSettle();
-    await t.tap(find.text('确认投币'));
-    await t.pumpAndSettle();
-    expect(calls, 1);
-    expect(relation.coin, 2);
-    expect(active(t, IconFont.coin), isTrue);
-    await selectFocusable(t, find.byIcon(IconFont.coin));
-    await flush(t);
-    expect(calls, 1);
   });
   testWidgets('取消一个收藏夹保留其它收藏状态，全部移除才熄灭', (t) async {
     final http = mockHttp();

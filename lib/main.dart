@@ -1,3 +1,4 @@
+import 'package:blt/utils/image_memory.dart';
 import 'dart:async';
 
 import 'package:blt/consts/color.dart';
@@ -44,6 +45,7 @@ Future<void> main() async {
     () async {
       // 初始化播放器
       WidgetsFlutterBinding.ensureInitialized();
+      ImageMemoryBudget.instance.install();
       MediaKit.ensureInitialized();
 
       // 初始化本地文件日志（失败仅控制台输出）

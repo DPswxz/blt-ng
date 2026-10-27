@@ -19,6 +19,7 @@ class SearchIdlePanel extends StatelessWidget {
   final ValueChanged<String> onSearch;
   final VoidCallback onClearHistory;
   final bool autofocusFirst; // 进入页面时焦点落在第一个胶囊上
+  final bool scrollable;
 
   const SearchIdlePanel({
     super.key,
@@ -27,6 +28,7 @@ class SearchIdlePanel extends StatelessWidget {
     required this.onSearch,
     required this.onClearHistory,
     this.autofocusFirst = false,
+    this.scrollable = true,
   });
 
   @override
@@ -54,9 +56,10 @@ class SearchIdlePanel extends StatelessWidget {
       );
     }
 
-    return SingleChildScrollView(
+    final content = Padding(
       padding: EdgeInsets.symmetric(horizontal: 48 * ui, vertical: 24 * ui),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (history.isNotEmpty) ...[
@@ -101,6 +104,7 @@ class SearchIdlePanel extends StatelessWidget {
         ],
       ),
     );
+    return scrollable ? SingleChildScrollView(child: content) : content;
   }
 
   Widget _buildTitle(
@@ -366,7 +370,10 @@ class SearchResultHeader extends StatelessWidget {
           height: 80 * ui,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 24 * ui, vertical: 14 * ui),
+            padding: EdgeInsets.symmetric(
+              horizontal: 24 * ui,
+              vertical: 14 * ui,
+            ),
             children: [
               for (final item in SearchOrder.values)
                 filterChip(

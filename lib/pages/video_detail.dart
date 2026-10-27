@@ -1,13 +1,7 @@
 import 'package:blt/apis/bilibili/library.dart';
-import 'package:blt/widgets/account_dialog.dart' show confirmAccountAction;
 import 'package:blt/widgets/video_comments.dart';
 import 'package:blt/apis/bilibili/media.dart'
-    show
-        getVideoInfo,
-        getArchiveRelation,
-        ArchiveRelation,
-        likeMedia,
-        insertCoin;
+    show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
 import 'package:blt/apis/bilibili/recommend.dart' show fetchRelatedVideos;
 import 'package:blt/apis/bilibili/toview.dart';
 import 'package:blt/apis/bilibili/user.dart'
@@ -229,6 +223,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
   void _onVideoTapped(int _, MediaCardInfo video) {
     Navigator.of(context).push(
       MaterialPageRoute(
+        maintainState: false,
         builder: (context) =>
             VideoDetailPageWrap(avid: video.avid, cid: video.cid),
       ),
@@ -617,36 +612,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     );
   }
 
-  Future<void> _onCoinTapped() async {
-    if (_actionBusy || !_requireLogin()) return;
-    if (widget.relation.coin >= 2) {
-      pushTooltipInfo(context, '已投 ${widget.relation.coin} 枚硬币，投币后不能撤回');
-      return;
-    }
-    _actionBusy = true;
-    try {
-      final selection = await _chooseAction('投币支持 UP 主', [
-        '投 1 枚硬币',
-        '投 2 枚硬币',
-      ]);
-      if (selection == null || !mounted) return;
-      final count = selection + 1;
-      final confirmed = await confirmAccountAction(
-        context,
-        title: '确认投币？',
-        message: '向该视频投 $count 枚硬币。投币后不能撤回。',
-        confirm: '确认投币',
-      );
-      if (!confirmed || !mounted) return;
-      await insertCoin(avid: widget.video.avid, count: count);
-      if (!mounted) return;
-      setState(() => widget.relation.coin += count);
-      pushTooltipInfo(context, '已投 $count 枚硬币');
-    } catch (e) {
-      if (mounted) showAppError(context, e);
-    } finally {
-      _actionBusy = false;
-    }
+  void _onCoinTapped() {
+    pushTooltipInfo(context, '功能暂未开放');
   }
 
   Future<void> _onFavoriteTapped() async {

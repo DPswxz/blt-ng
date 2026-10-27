@@ -1,3 +1,6 @@
+import 'package:blt/utils/playback_completion.dart';
+import 'package:blt/widgets/playback_completed.dart';
+import 'package:blt/utils/request_scope.dart';
 import 'package:blt/widgets/danmaku_settings.dart';
 import 'dart:async';
 import 'package:blt/utils/playback_policy.dart';
@@ -63,10 +66,16 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
+  final _videoRequests = RequestScope();
   late final ValueNotifier<int> _currentCid;
   late GetVideoPlayURLResponse _videoPlayURLInfo;
   late final ValueNotifier<Quality?> _currentQuality;
   late int _playingCid; // 当前实际播放的分P，用于进度上报，避免与_currentCid错配
+
+  int _avidForCid(int cid) =>
+      widget.video.episodes.where((e) => e.cid == cid).firstOrNull?.aid ??
+      widget.video.avid;
+  int get _playingAvid => _avidForCid(_playingCid);
 
   late final TclVideoController _controller;
   late final BilibiliDanmakuWallController _danmakuCtl;
@@ -91,7 +100,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Timer? _codecRecoveryTimer;
   Timer? _telemetryTimer;
   Timer? _heartbeatTimer; // 播放心跳timer
-  Timer? _autoNextTimer; // 播完自动切下一分P的计时器
   late final StreamController<bool> loading;
 
   // memoize合并流，避免rebuild时StreamBuilder对单订阅loading流重新订阅
@@ -99,7 +107,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _controller.player.stream.buffering,
     loading.stream,
   );
-  StreamSubscription<bool>? _completedSub;
+  late final PlaybackCompletionController _completion;
+  bool _suppressCompletionKeyUp = false;
+  bool _initialPositionConsumed = false;
   StreamSubscription<String>? _errorSub;
   final _videoReady = ValueNotifier(false);
 
@@ -116,9 +126,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         _acceptMetrics(event.text);
       }
     });
-    _completedSub = _controller.player.stream.completed.listen((v) {
-      if (v) _onPlayCompleted();
-    });
     _errorSub = _controller.player.stream.error.listen(_onPlayError);
     _danmakuCtl = BilibiliDanmakuWallController(widget.danmu);
     _screenFocusNode = FocusNode();
@@ -129,6 +136,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _playbackRate = ValueNotifier(1);
     _aspectMode = ValueNotifier(PlayerAspectMode.fit);
     _loopMode = ValueNotifier(PlayerLoopMode.none);
+    _completion = PlaybackCompletionController(
+      completed: _controller.player.stream.completed,
+      shouldShow: () =>
+          mounted &&
+          _videoReady.value &&
+          _loopMode.value == PlayerLoopMode.none,
+      onCompleted: _onPlayCompleted,
+      seek: (position) async {
+        _danmakuCtl.wait(_danmakuWaitDuration);
+        _danmakuCtl.clear();
+        await _controller.player.seek(position);
+      },
+      play: () => _controller.player.play(),
+    );
     loading = StreamController<bool>();
     _loadPlayerSettings().ignore();
     _onEpisodeChanged();
@@ -140,12 +161,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   void dispose() {
+    _videoRequests.dispose();
     _codecRecoveryTimer?.cancel();
     _metricsSub?.cancel();
     _telemetryTimer?.cancel();
     if (_heartbeatTimer != null) _heartbeatTimer!.cancel();
-    _cancelAutoNext();
-    _completedSub?.cancel();
+    _completion.dispose();
     _errorSub?.cancel();
     if (!loading.isClosed) loading.close();
     _displayControl.removeListener(_onDisplayControlChanged);
@@ -169,21 +190,26 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       final rate = double.tryParse(
         await Settings.getString(Settings.pathPlaybackRateSwitch) ?? '',
       );
+      if (!mounted) return;
       if (rate != null && playerPlaybackRates.contains(rate)) {
         _playbackRate.value = rate;
       }
       final aspect = PlayerAspectMode.parse(
         await Settings.getString(Settings.pathAspectModeSwitch),
       );
+      if (!mounted) return;
       if (aspect != null) _aspectMode.value = aspect;
       final loop = PlayerLoopMode.parse(
         await Settings.getString(Settings.pathLoopModeSwitch),
       );
+      if (!mounted) return;
       if (loop != null) _loopMode.value = loop;
     } catch (_) {
       // 读取失败时使用默认值
     }
+    if (!mounted) return;
     await _controller.player.setRate(_playbackRate.value);
+    if (!mounted) return;
     await _controller.player.setPlaylistMode(_toPlaylistMode(_loopMode.value));
   }
 
@@ -380,7 +406,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       // 上报播放进度
       if (loginInfoNotifier.value.isLogin) {
         reportPlayProgress(
-          widget.video.avid,
+          _playingAvid,
           _playingCid,
           _controller.player.state.position,
         ).ignore();
@@ -396,26 +422,30 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  Future<void> _onEpisodeChanged() async {
+  Future<void> _onEpisodeChanged() =>
+      _videoRequests.run(_loadEpisode, replace: true);
+
+  Future<void> _loadEpisode() async {
     // 快照本次请求的分P，若处理过程中用户又切了分P则丢弃本次结果
     final cid = _currentCid.value;
+    final currentAvid = _avidForCid(cid);
     _recoveryBudget = 8;
     // 新分P就绪前禁止画质等操作，避免用到旧分P的播放信息
     _videoReady.value = false;
     // 结束心跳
     _heartbeatTimer?.cancel();
     // 取消待执行的自动下一分P
-    _cancelAutoNext();
+    _completion.reset();
     // 上报上一分P的播放进度（使用实际播放中的cid，避免切P后cid与位置错配）
     if (loginInfoNotifier.value.isLogin &&
         _controller.player.state.position.inSeconds > 0) {
       reportPlayProgress(
-        widget.video.avid,
+        _playingAvid,
         _playingCid,
         _controller.player.state.position,
       ).ignore();
     }
-    reportPlayStart(widget.video.avid, cid).ignore();
+    reportPlayStart(currentAvid, cid).ignore();
     // 暂停弹幕
     final danmakuEnabled = _danmakuCtl.enabled;
     _danmakuCtl.enabled = false;
@@ -428,7 +458,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       if (loginInfoNotifier.value.isLogin) {
         try {
           final lastPlayInfo = await getMediaPlayInfo(
-            avid: widget.video.avid,
+            avid: currentAvid,
             cid: cid,
           );
           if (cid == lastPlayInfo.lastPlayCid) {
@@ -439,7 +469,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       }
 
       final info = await getVideoPlayURL(
-        avid: widget.video.avid,
+        avid: currentAvid,
         cid: cid,
         episodeId: widget.video.episodes
             .where((e) => e.cid == cid)
@@ -488,7 +518,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       await _playDashMedia(
         info.dashData,
         quality,
-        start: widget.initialPosition ?? playInfo?.lastPlayTime,
+        start: !_initialPositionConsumed
+            ? widget.initialPosition ?? playInfo?.lastPlayTime
+            : playInfo?.lastPlayTime,
       );
       if (!mounted || cid != _currentCid.value) return;
 
@@ -504,6 +536,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       _currentQuality.value = quality;
       _videoReady.value = true;
       success = true;
+      _initialPositionConsumed = true;
       // 开始周期心跳（每15秒上报一次，切P/退出时取消）
       _heartbeatTimer = Timer.periodic(
         const Duration(seconds: 15),
@@ -530,7 +563,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void _onHeartbeat() {
     if (!loginInfoNotifier.value.isLogin) return;
     reportPlayHeartbeat(
-      avid: widget.video.avid,
+      avid: _playingAvid,
       cid: _playingCid,
       progress: _controller.player.state.position,
     ).ignore();
@@ -731,39 +764,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  void _cancelAutoNext() {
-    _autoNextTimer?.cancel();
-    _autoNextTimer = null;
-  }
-
   void _onPlayCompleted() {
     // 上报播放进度
     if (loginInfoNotifier.value.isLogin) {
       reportPlayProgress(
-        widget.video.avid,
+        _playingAvid,
         _playingCid,
         _controller.player.state.position,
       ).ignore();
     }
 
-    // 单个循环由播放器内部循环，不触发自动下一分P
-    if (_loopMode.value == PlayerLoopMode.single) return;
+    if (!mounted ||
+        !_videoReady.value ||
+        _loopMode.value == PlayerLoopMode.single) {
+      return;
+    }
+    _displayControl.value = false;
+    _panelVisible.value = false;
+    _danmakuCtl.clear();
+  }
 
-    final index = widget.video.episodes.indexWhere((e) => e.cid == _playingCid);
-    if (index < 0 || index == widget.video.episodes.length - 1) return;
-    if (!mounted) return;
-
-    // 3秒后自动切到下一分P，用户seek或手动切P会取消该计时器
-    _autoNextTimer = Timer(const Duration(seconds: 3), () {
-      _autoNextTimer = null;
-      if (!mounted ||
-          _currentCid.value != widget.video.episodes[index].cid ||
-          _playingCid != widget.video.episodes[index].cid) {
-        return;
-      }
-      _currentCid.value = widget.video.episodes[index + 1].cid;
-    });
-    pushTooltipInfo(context, '即将播放下一分P', duration: const Duration(seconds: 3));
+  Future<void> _restartCompletedVideo() async {
+    _suppressCompletionKeyUp = HardwareKeyboard.instance.logicalKeysPressed.any(
+      (key) =>
+          key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select,
+    );
+    try {
+      await _completion.restart();
+      if (mounted) _screenFocusNode.requestFocus();
+    } catch (e) {
+      if (mounted) showAppError(context, e);
+    }
   }
 
   // 当前分P下标，-1 表示不在列表中
@@ -790,7 +821,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   void _onSeekPosition(Duration position) {
     _controller.player.seek(position);
-    _cancelAutoNext();
+    _completion.reset();
     _danmakuCtl.wait(_danmakuWaitDuration);
     _danmakuCtl.clear();
   }
@@ -984,7 +1015,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (!mounted || selected == null) return;
     _loopMode.value = selected;
     await Settings.setString(Settings.pathLoopModeSwitch, selected.value);
-    if (selected == PlayerLoopMode.single) _cancelAutoNext();
+    if (selected == PlayerLoopMode.single) _completion.reset();
     await _controller.player.setPlaylistMode(_toPlaylistMode(selected));
   }
 
@@ -1025,6 +1056,27 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     child: _buildControlLayer(display),
                   ),
                 ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: _completion,
+                builder: (_, finished, _) => finished
+                    ? PlaybackCompletedOverlay(
+                        title:
+                            widget.video.episodes
+                                .where((e) => e.cid == _playingCid)
+                                .firstOrNull
+                                ?.title ??
+                            widget.video.title,
+                        onRestart: _restartCompletedVideo,
+                        onBack: () => Get.back(),
+                        onNext:
+                            _currentEpisodeIndex >= 0 &&
+                                _currentEpisodeIndex <
+                                    widget.video.episodes.length - 1
+                            ? _onNextEpisode
+                            : null,
+                      )
+                    : const SizedBox.shrink(),
               ),
             ],
           ),
@@ -1222,6 +1274,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _onKeyEvent(KeyEvent value) {
+    if (_suppressCompletionKeyUp &&
+        value is KeyUpEvent &&
+        (value.logicalKey == LogicalKeyboardKey.enter ||
+            value.logicalKey == LogicalKeyboardKey.select)) {
+      _suppressCompletionKeyUp = false;
+      return;
+    }
+    if (_completion.value) return;
     if (!_displayControl.value) {
       if (value is KeyDownEvent || value is KeyRepeatEvent) {
         switch (value.logicalKey) {
@@ -1276,7 +1336,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _onStepForward(bool forward) {
-    _cancelAutoNext();
+    _completion.reset();
     if (forward) {
       if (_controller.player.state.duration -
               _controller.player.state.position <

@@ -1,3 +1,5 @@
+import 'package:blt/utils/request_scope.dart';
+import 'package:blt/widgets/pink_style.dart';
 import 'dart:math';
 
 import 'package:animated_infinite_scroll_pagination/animated_infinite_scroll_pagination.dart'
@@ -11,7 +13,6 @@ import 'package:blt/widgets/video_card.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get/get.dart';
 
 class _VideoGridViewController
     with AnimatedInfinitePaginationController<MediaCardInfo> {
@@ -49,6 +50,7 @@ class VideoGridViewProvider {
   late bool _hasMore = onLoad == null;
   final _refreshing = ValueNotifier(false);
   late final ScrollController _scrollCtl = ScrollController();
+  final _requests = RequestScope();
   bool _disposed = false;
   bool _fetching = false;
   int _generation = 0;
@@ -58,6 +60,9 @@ class VideoGridViewProvider {
   VideoGridViewProvider({this.initVideos = const [], this.onLoad});
 
   void dispose() {
+    _requests.dispose();
+    _generation++;
+    onLoad = null;
     _disposed = true;
     _refreshing.dispose();
     _scrollCtl.dispose();
@@ -82,7 +87,12 @@ class VideoGridViewProvider {
     _ctl.setTotal(_ctl.items.value.length);
   }
 
-  void clear() => _ctl.clear();
+  void clear() {
+    if (_disposed) return;
+    _generation++;
+    _requests.cancel();
+    _ctl.clear();
+  }
 
   Future<void> refresh({saveInitData = true}) async {
     if (_disposed || _refreshing.value) return;
@@ -138,7 +148,10 @@ class VideoGridViewProvider {
     try {
       _ctl.emitState(const PaginationLoadingState());
 
-      final (newVideos, hasMore) = await onLoad!(isFetchMore: isFetchMore);
+      final (newVideos, hasMore) = await _requests.run(
+        () => onLoad!(isFetchMore: isFetchMore),
+        replace: !isFetchMore,
+      );
       if (_disposed || generation != _generation) return;
       _hasMore = hasMore;
       addAll(newVideos);
@@ -338,36 +351,55 @@ class _VideoGridViewState<T> extends State<VideoGridView<T>> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16 * ui)),
       ),
-      builder: (_) {
+      builder: (sheetContext) {
         final actions = widget.itemMenuActions
             .asMap()
             .map(
               (index, item) => MapEntry(
                 index,
-                MaterialButton(
-                  autofocus: index == 0,
-                  onPressed: () {
-                    Get.back();
-                    item.action(media);
-                  },
-                  focusColor: biliPink.withValues(alpha: 0.15),
-                  padding: EdgeInsets.symmetric(horizontal: 8 * ui),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14 * ui),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(item.icon, size: 40 * ui, color: biliPink),
-                      SizedBox(height: 4 * ui),
-                      Text(
-                        item.title,
-                        style: TextStyle(
-                          fontSize: 20 * ui,
-                          color: Colors.black87,
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.all(8 * ui),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        item.action(media);
+                      },
+                      child: DpadFocusable(
+                        autofocus: index == 0,
+                        onSelect: () {
+                          Navigator.of(sheetContext).pop();
+                          item.action(media);
+                        },
+                        builder: pinkFocusEffect(
+                          ui: ui,
+                          radius: 14 * ui,
+                          focusedBackgroundColor: Colors.white,
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12 * ui,
+                            vertical: 18 * ui,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(item.icon, size: 40 * ui, color: biliPink),
+                              SizedBox(height: 8 * ui),
+                              Text(
+                                item.title,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 20 * ui,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

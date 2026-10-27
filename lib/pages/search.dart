@@ -1,3 +1,4 @@
+import 'package:blt/utils/request_scope.dart';
 import 'dart:async';
 
 import 'package:blt/apis/bilibili/search.dart';
@@ -17,7 +18,6 @@ import 'package:blt/widgets/pink_style.dart';
 import 'package:blt/widgets/search_panels.dart';
 import 'package:blt/widgets/tooltip.dart';
 import 'package:blt/widgets/video_grid_view.dart';
-import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -35,7 +35,12 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => SearchPageState();
 }
 
-class SearchPageState extends State<SearchPage> {
+class SearchPageState extends State<SearchPage> with WidgetsBindingObserver {
+  final _requests = RequestScope();
+  final _suggestRequests = RequestScope();
+  final _searchRequests = RequestScope();
+  bool _editing = false;
+  bool _keyboardVisible = false;
   static const _suggestDebounce = Duration(milliseconds: 250);
   static const _hotWordCount = 10;
 
@@ -65,6 +70,7 @@ class SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final loggedIn = loginInfoNotifier.value.isLogin;
     _state = loggedIn ? _SearchState.idle : _SearchState.loginRequired;
     _provider = VideoGridViewProvider(onLoad: _onLoad);
@@ -75,6 +81,12 @@ class SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _requests.dispose();
+    _suggestRequests.dispose();
+    _searchRequests.dispose();
+    _searchSeq++;
+    _suggestSeq++;
+    WidgetsBinding.instance.removeObserver(this);
     _suggestTimer?.cancel();
     _suggestions.dispose();
     _searchController.dispose();
@@ -91,17 +103,47 @@ class SearchPageState extends State<SearchPage> {
         event.logicalKey == LogicalKeyboardKey.goBack &&
         _suggestions.value.isNotEmpty) {
       _closeSuggestions();
-      _inputFocusNode.unfocus();
+      dismissInput();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
+  @override
+  void didChangeMetrics() {
+    final visible =
+        WidgetsBinding
+            .instance
+            .platformDispatcher
+            .views
+            .first
+            .viewInsets
+            .bottom >
+        0;
+    if (_keyboardVisible && !visible && _editing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _editing) dismissInput();
+      });
+    }
+    _keyboardVisible = visible;
+  }
+
+  void _beginEditing() {
+    if (_state == _SearchState.loginRequired || _editing) return;
+    setState(() => _editing = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_editing) return;
+      _inputFocusNode.requestFocus();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    });
+  }
+
   bool dismissInput() {
-    if (!_inputFocusNode.hasFocus && _suggestions.value.isEmpty) return false;
+    if (!_editing && _suggestions.value.isEmpty) return false;
     _closeSuggestions();
-    _inputFocusNode.unfocus();
+    setState(() => _editing = false);
     SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    _inputFocusNode.requestFocus();
     return true;
   }
 
@@ -111,9 +153,12 @@ class SearchPageState extends State<SearchPage> {
     _suggestions.value = const [];
   }
 
-  // 再次点击侧栏"搜索"：直接聚焦输入框（唤起系统键盘），作为"我要打字"的快捷方式
+  void focusInput() => _onEntryTapped();
+
+  // 再次进入只聚焦输入框，确认后才编辑。
   void _onEntryTapped() {
     if (_state == _SearchState.loginRequired) return;
+    if (_editing) dismissInput();
     _inputFocusNode.requestFocus();
   }
 
@@ -125,7 +170,9 @@ class SearchPageState extends State<SearchPage> {
 
   Future<void> _loadHotWords() async {
     try {
-      final words = await searchHotWords(limit: _hotWordCount);
+      final words = await _requests.run(
+        () => searchHotWords(limit: _hotWordCount),
+      );
       if (!mounted) return;
       setState(() => _hotWords = words);
     } catch (_) {
@@ -147,7 +194,10 @@ class SearchPageState extends State<SearchPage> {
   Future<void> _requestSuggest(String keyword) async {
     final seq = ++_suggestSeq;
     try {
-      final words = await searchSuggest(keyword);
+      final words = await _suggestRequests.run(
+        () => searchSuggest(keyword),
+        replace: true,
+      );
       if (!mounted || seq != _suggestSeq) return;
       // 输入框内容已变化时丢弃过期联想
       if (_searchController.text.trim() != keyword) return;
@@ -155,12 +205,6 @@ class SearchPageState extends State<SearchPage> {
     } catch (_) {
       // 联想失败静默处理
     }
-  }
-
-  void _onClearInput() {
-    _closeSuggestions();
-    _searchController.clear();
-    _inputFocusNode.requestFocus();
   }
 
   // 点击历史/热搜/联想词：回填输入框并直接搜索
@@ -180,6 +224,8 @@ class SearchPageState extends State<SearchPage> {
       return;
     }
 
+    if (_editing) setState(() => _editing = false);
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
     // 提交后收起键盘与联想面板，避免遮挡结果
     FocusManager.instance.primaryFocus?.unfocus();
     _closeSuggestions();
@@ -197,11 +243,10 @@ class SearchPageState extends State<SearchPage> {
     });
 
     try {
-      final result = await searchVideos(
-        keyword,
-        page: 1,
-        order: _order,
-        duration: _duration,
+      final result = await _searchRequests.run(
+        () =>
+            searchVideos(keyword, page: 1, order: _order, duration: _duration),
+        replace: true,
       );
       if (!mounted || seq != _searchSeq) return;
 
@@ -272,6 +317,20 @@ class SearchPageState extends State<SearchPage> {
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
+    // Keep the history, not the heavy result grid hidden beneath the detail route.
+    _searchSeq++;
+    _searchRequests.cancel();
+    _provider.clear();
+    _closeSuggestions();
+    _searchController.clear();
+    _inputFocusNode.unfocus();
+    setState(() {
+      _editing = false;
+      _keyword = '';
+      _page = 0;
+      _total = 0;
+      _state = _SearchState.idle;
+    });
     Get.to(() => VideoDetailPageWrap(avid: video.avid, cid: video.cid));
   }
 
@@ -288,6 +347,40 @@ class SearchPageState extends State<SearchPage> {
             560 * ui,
             880 * ui,
           );
+          if (_state == _SearchState.idle) {
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 1400 * ui),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(vertical: 32 * ui),
+                  child: Stack(
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSearchBar(ui, inputWidth),
+                          SizedBox(height: 20 * ui),
+                          SearchIdlePanel(
+                            history: _history,
+                            hotWords: _hotWords,
+                            scrollable: false,
+                            onSearch: _onWordTapped,
+                            onClearHistory: () => unawaited(_onClearHistory()),
+                          ),
+                        ],
+                      ),
+                      Positioned(
+                        top: 80 * ui,
+                        left: 0,
+                        right: 0,
+                        child: _buildSuggestions(inputWidth),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
           return Column(
             children: [
               Padding(
@@ -303,24 +396,7 @@ class SearchPageState extends State<SearchPage> {
                       top: 0,
                       left: 0,
                       right: 0,
-                      child: ValueListenableBuilder<List<String>>(
-                        valueListenable: _suggestions,
-                        builder: (context, suggestions, _) {
-                          if (suggestions.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-                          return Center(
-                            child: SizedBox(
-                              width: inputWidth,
-                              child: SearchSuggestPanel(
-                                keyword: _searchController.text,
-                                suggestions: suggestions,
-                                onSelected: _onWordTapped,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                      child: _buildSuggestions(inputWidth),
                     ),
                   ],
                 ),
@@ -331,6 +407,26 @@ class SearchPageState extends State<SearchPage> {
       ),
     );
   }
+
+  Widget _buildSuggestions(double inputWidth) =>
+      ValueListenableBuilder<List<String>>(
+        valueListenable: _suggestions,
+        builder: (context, suggestions, _) {
+          if (suggestions.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return Center(
+            child: SizedBox(
+              width: inputWidth,
+              child: SearchSuggestPanel(
+                keyword: _searchController.text,
+                suggestions: suggestions,
+                onSelected: _onWordTapped,
+              ),
+            ),
+          );
+        },
+      );
 
   Widget _buildSearchBar(double ui, double inputWidth) {
     // 未登录时整行不可聚焦并灰化，避免搜了没结果还不知道原因
@@ -371,69 +467,56 @@ class SearchPageState extends State<SearchPage> {
         backgroundColor: Colors.white.withValues(alpha: 0.92),
         focusedBackgroundColor: Colors.white,
         scale: 1.01,
-        child: TextField(
-          controller: _searchController,
-          focusNode: _inputFocusNode,
-          textAlignVertical: TextAlignVertical.center,
-          textInputAction: TextInputAction.search,
-          cursorColor: biliPink,
-          style: TextStyle(fontSize: 24 * ui, color: Colors.black87),
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            prefixIcon: Icon(
-              Icons.search_rounded,
-              size: 32 * ui,
-              color: biliPink,
+        child: CallbackShortcuts(
+          bindings: {
+            if (!_editing) ...{
+              const SingleActivator(LogicalKeyboardKey.enter): _beginEditing,
+              const SingleActivator(LogicalKeyboardKey.select): _beginEditing,
+              const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                  _beginEditing,
+            },
+            for (final entry in {
+              LogicalKeyboardKey.arrowUp: TraversalDirection.up,
+              LogicalKeyboardKey.arrowDown: TraversalDirection.down,
+              LogicalKeyboardKey.arrowLeft: TraversalDirection.left,
+              LogicalKeyboardKey.arrowRight: TraversalDirection.right,
+            }.entries)
+              SingleActivator(entry.key): () {
+                // The native TV keyboard consumes its own arrow keys. Once keys
+                // reach Flutter again, restore navigation even if no inset event arrived.
+                if (_editing) dismissInput();
+                _inputFocusNode.focusInDirection(entry.value);
+              },
+          },
+          child: TextField(
+            readOnly: !_editing,
+            showCursor: _editing,
+            onTap: _beginEditing,
+            controller: _searchController,
+            focusNode: _inputFocusNode,
+            textAlignVertical: TextAlignVertical.center,
+            textInputAction: TextInputAction.search,
+            cursorColor: biliPink,
+            style: TextStyle(fontSize: 24 * ui, color: Colors.black87),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 32 * ui,
+                color: biliPink,
+              ),
+              hintText: '请输入搜索内容',
+              hintStyle: TextStyle(
+                fontSize: 24 * ui,
+                color: Colors.grey.shade500,
+              ),
+              contentPadding: EdgeInsets.zero,
             ),
-            hintText: '请输入搜索内容',
-            hintStyle: TextStyle(
-              fontSize: 24 * ui,
-              color: Colors.grey.shade500,
-            ),
-            contentPadding: EdgeInsets.zero,
-            suffixIcon: _buildClearButton(ui),
+            onChanged: _onKeywordChanged,
+            onSubmitted: (text) => _onSubmit(text: text),
           ),
-          onChanged: _onKeywordChanged,
-          onSubmitted: (text) => _onSubmit(text: text),
         ),
       ),
-    );
-  }
-
-  // 清空按钮：有内容时才可聚焦，点击后保留输入焦点继续打字
-  Widget _buildClearButton(double ui) {
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: _searchController,
-      builder: (context, value, _) {
-        final enabled = value.text.isNotEmpty;
-        // 注意：suffixIcon 的约束是"整行剩余宽度"，这里必须是固定尺寸盒子，
-        // 否则会把输入区挤成 0 宽（Center 之类会吃满可用宽度）
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: enabled ? _onClearInput : null,
-          child: DpadFocusable(
-            enabled: enabled,
-            onSelect: _onClearInput,
-            builder: (context, isFocused, _) => buildPinkFocusEffect(
-              ui: ui,
-              radius: 24 * ui,
-              borderWidth: 2 * ui,
-              isFocused: isFocused,
-              backgroundColor: enabled ? focusableSurfaceColor : null,
-              focusedBackgroundColor: Colors.white,
-              child: SizedBox(
-                width: 48 * ui,
-                height: 48 * ui,
-                child: Icon(
-                  Icons.close_rounded,
-                  size: 26 * ui,
-                  color: enabled ? biliPink : Colors.grey.shade400,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 

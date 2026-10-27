@@ -98,6 +98,7 @@ class TclExoPlayer extends PlatformPlayer {
   Map<String, String> _headers = {};
   void attach(int id) {
     if (_disposed) return;
+    _events?.cancel().ignore();
     _channel = MethodChannel('blt/media3/$id');
     _events = EventChannel('blt/media3/$id/events')
         .receiveBroadcastStream()
@@ -118,6 +119,7 @@ class TclExoPlayer extends PlatformPlayer {
               );
             }
             if (!event.containsKey('position')) return;
+            final previous = state;
             state = state.copyWith(
               position: Duration(
                 milliseconds: (event['position'] as num).toInt(),
@@ -130,12 +132,24 @@ class TclExoPlayer extends PlatformPlayer {
               buffering: event['buffering'] as bool,
               completed: event['completed'] as bool,
             );
-            positionController.add(state.position);
-            durationController.add(state.duration);
-            bufferController.add(state.buffer);
-            playingController.add(state.playing);
-            bufferingController.add(state.buffering);
-            completedController.add(state.completed);
+            if (previous.position != state.position) {
+              positionController.add(state.position);
+            }
+            if (previous.duration != state.duration) {
+              durationController.add(state.duration);
+            }
+            if (previous.buffer != state.buffer) {
+              bufferController.add(state.buffer);
+            }
+            if (previous.playing != state.playing) {
+              playingController.add(state.playing);
+            }
+            if (previous.buffering != state.buffering) {
+              bufferingController.add(state.buffering);
+            }
+            if (previous.completed != state.completed) {
+              completedController.add(state.completed);
+            }
           },
           onError: (Object error) {
             if (!_disposed) errorController.add('原生播放器连接失败');
@@ -203,6 +217,8 @@ class TclExoPlayer extends PlatformPlayer {
     await _events?.cancel();
     try {
       await _channel?.invokeMethod<void>('release');
+    } on PlatformException {
+      // The platform view may already have released the native player.
     } on MissingPluginException {
       // The platform view may already have released the native player.
     } finally {

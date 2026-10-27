@@ -1,3 +1,4 @@
+import 'package:blt/utils/request_scope.dart';
 import 'package:blt/utils/ui_scale.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:flutter/material.dart';
@@ -10,10 +11,10 @@ Widget buildLoadingStyle1() {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              "assets/images/loading/loading1.gif",
-              width: 216 * ui,
-              height: 216 * ui,
+            SizedBox(
+              width: 48 * ui,
+              height: 48 * ui,
+              child: const CircularProgressIndicator(strokeWidth: 3),
             ),
             SizedBox(height: 16 * ui),
             Text(
@@ -35,10 +36,10 @@ Widget buildLoadingStyle3() {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              "assets/images/loading/loading3.gif",
-              width: 90 * ui,
-              height: 90 * ui,
+            SizedBox(
+              width: 32 * ui,
+              height: 32 * ui,
+              child: const CircularProgressIndicator(strokeWidth: 3),
             ),
             SizedBox(height: 16 * ui),
             Text(
@@ -102,6 +103,7 @@ class LoadingWidget<T> extends StatefulWidget {
 }
 
 class _LoadingWidgetState<T> extends State<LoadingWidget<T>> {
+  final _requests = RequestScope();
   late final ValueNotifier<bool> _isLoading;
   T? _data;
   Object? _error;
@@ -118,7 +120,7 @@ class _LoadingWidgetState<T> extends State<LoadingWidget<T>> {
     _error = null;
     _isLoading.value = true;
     try {
-      final data = await widget.loader();
+      final data = await _requests.run(widget.loader, replace: true);
       // 加载过程中页面可能已被销毁
       if (!mounted) return;
       _data = data;
@@ -132,6 +134,7 @@ class _LoadingWidgetState<T> extends State<LoadingWidget<T>> {
 
   @override
   void dispose() {
+    _requests.dispose();
     if (widget.isLoading == null) _isLoading.dispose();
     super.dispose();
   }

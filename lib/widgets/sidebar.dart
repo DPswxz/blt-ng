@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:blt/utils/ui_scale.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:blt/widgets/side_panel.dart';
@@ -13,14 +14,20 @@ class SidebarItemData {
   final String label;
   final bool selected;
   final bool autofocus;
+  final bool boldIcon;
   final VoidCallback onTap;
+  final VoidCallback? onRight;
+  final FocusNode? focusAnchor;
 
   const SidebarItemData({
     required this.icon,
     required this.label,
     required this.selected,
     this.autofocus = false,
+    this.boldIcon = false,
     required this.onTap,
+    this.onRight,
+    this.focusAnchor,
   });
 }
 
@@ -28,6 +35,7 @@ class SidebarItemData {
 class Sidebar extends StatelessWidget {
   final Widget avatar;
   final VoidCallback onAvatarTap;
+  final FocusNode? avatarFocusAnchor;
   final List<SidebarItemData> items;
   final SidebarItemData? footer;
 
@@ -35,6 +43,7 @@ class Sidebar extends StatelessWidget {
     super.key,
     required this.avatar,
     required this.onAvatarTap,
+    this.avatarFocusAnchor,
     required this.items,
     this.footer,
   });
@@ -45,7 +54,11 @@ class Sidebar extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _SidebarAvatar(onTap: onAvatarTap, child: avatar),
+          Focus(
+            focusNode: avatarFocusAnchor,
+            canRequestFocus: false,
+            child: _SidebarAvatar(onTap: onAvatarTap, child: avatar),
+          ),
           ...items.map((item) => _SidebarTab(item: item)),
           if (footer != null) _SidebarTab(item: footer!),
         ],
@@ -85,16 +98,45 @@ class _SidebarTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
-    return SidePanelTile(
-      leading: Icon(
-        item.icon,
-        size: 48 * ui,
-        color: item.selected ? navigationAccentColor : _unselectedIconColor,
+    return Focus(
+      focusNode: item.focusAnchor,
+      canRequestFocus: false,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.arrowRight &&
+            item.onRight != null) {
+          item.onRight!();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: SidePanelTile(
+        leading: Icon(
+          item.icon,
+          size: 48 * ui,
+          color: item.selected ? navigationAccentColor : _unselectedIconColor,
+          shadows: item.boldIcon
+              ? [
+                  for (final offset in const [
+                    Offset(-0.65, 0),
+                    Offset(0.65, 0),
+                    Offset(0, -0.65),
+                    Offset(0, 0.65),
+                  ])
+                    Shadow(
+                      color: item.selected
+                          ? navigationAccentColor
+                          : _unselectedIconColor,
+                      offset: offset * ui,
+                    ),
+                ]
+              : null,
+        ),
+        label: item.label,
+        selected: item.selected,
+        autofocus: item.autofocus,
+        onTap: item.onTap,
       ),
-      label: item.label,
-      selected: item.selected,
-      autofocus: item.autofocus,
-      onTap: item.onTap,
     );
   }
 }

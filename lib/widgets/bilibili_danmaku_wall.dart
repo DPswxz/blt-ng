@@ -1,3 +1,4 @@
+import 'package:blt/utils/request_scope.dart';
 import 'dart:async';
 
 import 'package:blt/apis/bilibili/media.dart';
@@ -79,6 +80,7 @@ class BilibiliDanmakuWall extends StatefulWidget {
 }
 
 class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
+  final _requests = RequestScope();
   int _danmuBlockWeight = 6;
   double _danmuFontSize = 20;
   int _danmuArea = 10;
@@ -134,6 +136,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   @override
   void dispose() {
+    _requests.dispose();
     widget.controller._reloadFunc = null;
     _timelineSubscription?.cancel();
     _playingSubscription?.cancel();
@@ -216,7 +219,10 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     // 请求前捕获cid，分P切换后旧分P的在途请求返回的数据不会被新分P使用
     final cid = widget.cid;
     try {
-      final danmakuResp = await getDanmaku(cid, index);
+      final danmakuResp = await _requests.run(
+        () => getDanmaku(cid, index),
+        replace: true,
+      );
       if (!mounted || widget.cid != cid) return;
       _danmakuCache = (cid, index, danmakuResp);
     } catch (_) {

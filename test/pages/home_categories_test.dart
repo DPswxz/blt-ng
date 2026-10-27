@@ -90,12 +90,12 @@ void main() {
       await t.tap(find.text('番剧'));
       await flush(t);
       expect(find.text('会员番剧'), findsOneWidget);
-      expect(find.text('大会员'), findsOneWidget);
-      expect(find.text('限免'), findsOneWidget);
+      expect(find.text('大会员'), findsNothing);
+      expect(find.text('限免'), findsNothing);
       await t.tap(find.text('会员番剧'));
       await flush(t);
-      expect(find.text('第一话'), findsOneWidget);
-      expect(find.text('大会员'), findsOneWidget);
+      expect(find.text('第一话'), findsWidgets);
+      expect(find.text('大会员'), findsNothing);
       await t.tap(find.text('返回'));
       await flush(t);
       expect(find.text('免费番剧'), findsOneWidget);

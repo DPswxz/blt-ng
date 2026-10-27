@@ -263,6 +263,13 @@ Future<(List<Cookie>, String)> refreshCookie(
   if (cookies.isEmpty) {
     throw const BilibiliError(-2, 'cookie刷新失败');
   }
+  // Refresh responses contain account cookies, not the existing browser IDs.
+  for (final old in await loadCookie()) {
+    if ((old.name == 'buvid3' || old.name == 'buvid4') &&
+        !cookies.any((c) => c.name == old.name)) {
+      cookies.add(old);
+    }
+  }
   final newRefreshToken = jsonString(jsonMap(data)?['refresh_token']);
   if (newRefreshToken.isEmpty) {
     throw const BilibiliError(-2, 'cookie刷新响应不完整');

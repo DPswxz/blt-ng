@@ -1,9 +1,11 @@
+import 'package:blt/pages/season_detail.dart';
+import 'package:blt/storages/recommendation_filter.dart';
 import 'package:blt/apis/bilibili/library.dart';
 import 'package:blt/pages/my_library.dart';
 import 'package:blt/utils/ui_scale.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:dpad/dpad.dart';
-import 'package:flutter_lazy_indexed_stack/flutter_lazy_indexed_stack.dart';
+import 'package:blt/widgets/bounded_page_stack.dart';
 import 'dart:async';
 
 import 'package:blt/apis/bilibili/recommend.dart';
@@ -30,12 +32,15 @@ class _HomeVideoFeed extends StatefulWidget {
 
 class _HomeVideoFeedState extends State<_HomeVideoFeed> {
   int _page = 0;
+  late final Future<RecommendationFilter> _filterFuture;
+  bool _hiding = false;
   final _pageVideoCount = 20;
   late final VideoGridViewProvider _provider;
 
   @override
   void initState() {
     super.initState();
+    _filterFuture = RecommendationFilter.load(loginInfoNotifier.value.mid);
     _provider = VideoGridViewProvider(onLoad: _onLoad);
     widget._tappedListener.addListener(_onRefresh);
   }
@@ -65,13 +70,46 @@ class _HomeVideoFeedState extends State<_HomeVideoFeed> {
       _page = nextPage;
       return result;
     }
-    final videos = await listRecommendVideos(
-      page: nextPage,
-      count: _pageVideoCount,
-      removeAvids: _provider.toList().map((e) => e.avid).toList(),
-    );
-    _page = nextPage;
-    return (videos, true);
+    final filter = await _filterFuture;
+    for (var attempts = 0; attempts < 5; attempts++) {
+      final videos = await listRecommendVideos(
+        page: _page + 1,
+        count: _pageVideoCount,
+        removeAvids: {
+          ..._provider.toList().map((e) => e.avid),
+          ...filter.videos,
+        }.toList(),
+      );
+      _page++;
+      final visible = videos.where(filter.allows).toList();
+      if (visible.isNotEmpty || videos.isEmpty) return (visible, true);
+    }
+    return (const <MediaCardInfo>[], true);
+  }
+
+  Future<void> _hideRecommendation(
+    MediaCardInfo media, {
+    required bool uploader,
+  }) async {
+    if (_hiding) return;
+    _hiding = true;
+    try {
+      final filter = await _filterFuture;
+      await filter.hide(media, uploader: uploader);
+      if (!mounted) return;
+      final remaining = _provider.toList().where(filter.allows).toList();
+      _provider.clear();
+      _provider.addAll(remaining);
+      if (remaining.isEmpty) unawaited(_provider.fetchData(isFetchMore: true));
+      pushTooltipInfo(
+        context,
+        uploader && media.userMid > 0 ? '已屏蔽此 UP 主的推荐' : '已移除不感兴趣的视频',
+      );
+    } catch (e) {
+      if (mounted) showAppError(context, e);
+    } finally {
+      _hiding = false;
+    }
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
@@ -84,6 +122,18 @@ class _HomeVideoFeedState extends State<_HomeVideoFeed> {
       provider: _provider,
       onItemTap: _onVideoTapped,
       itemMenuActions: [
+        if (!widget.popular) ...[
+          ItemMenuAction(
+            title: '内容不感兴趣',
+            icon: Icons.not_interested_rounded,
+            action: (media) => _hideRecommendation(media, uploader: false),
+          ),
+          ItemMenuAction(
+            title: '不想看此UP主',
+            icon: Icons.person_off_rounded,
+            action: (media) => _hideRecommendation(media, uploader: true),
+          ),
+        ],
         ItemMenuAction(
           title: '稍后再看',
           icon: Icons.playlist_add_rounded,
@@ -193,8 +243,9 @@ class _RecommendPageState extends State<RecommendPage> {
           ),
         ),
         Expanded(
-          child: LazyIndexedStack(
+          child: BoundedPageStack(
             index: _section,
+            capacity: 1,
             children: [
               _HomeVideoFeed(_refresh[0]),
               _HomeVideoFeed(_refresh[1], popular: true),
@@ -216,7 +267,6 @@ class _BangumiHome extends StatefulWidget {
 
 class _BangumiHomeState extends State<_BangumiHome> {
   int _revision = 0;
-  LibraryEntry? _season;
   @override
   void initState() {
     super.initState();
@@ -231,18 +281,11 @@ class _BangumiHomeState extends State<_BangumiHome> {
   }
 
   @override
-  Widget build(BuildContext context) => _season == null
-      ? LibraryCollectionPane(
-          key: ValueKey('catalog-$_revision'),
-          title: '番剧',
-          loader: (page) => listBangumiCatalog(page: page),
-          onOpen: (season) => setState(() => _season = season),
-        )
-      : LibraryCollectionPane(
-          key: ValueKey('episodes-${_season!.id}-$_revision'),
-          title: _season!.title,
-          onBack: () => setState(() => _season = null),
-          loader: (_) => listSeasonEpisodes(_season!.id),
-          onOpen: (episode) => playLibraryEpisode(context, _season!, episode),
-        );
+  Widget build(BuildContext context) => LibraryCollectionPane(
+    key: ValueKey('catalog-$_revision'),
+    title: '番剧',
+    showHeader: false,
+    loader: (page) => listBangumiCatalog(page: page),
+    onOpen: (season) => openSeasonDetail(context, season),
+  );
 }

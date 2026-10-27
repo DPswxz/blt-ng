@@ -246,6 +246,7 @@ class Stat {
 // 剧集信息
 class Episode {
   final int? episodeId;
+  final int? aid; // 番剧各集有独立稿件号；普通视频分P使用主稿件号。
   final int index; // 从1开始
   final int cid;
   final String title;
@@ -253,6 +254,7 @@ class Episode {
 
   const Episode({
     this.episodeId,
+    this.aid,
     required this.index,
     required this.cid,
     required this.title,

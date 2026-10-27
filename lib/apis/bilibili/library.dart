@@ -224,6 +224,12 @@ Future<LibraryBatch> listSeasonEpisodes(int season) async {
         ),
       ) ??
       {};
+  final items = parseSeasonEpisodes(data);
+  if (items.isEmpty) throw const BilibiliError(-2, '该剧集暂无可播放分集');
+  return LibraryBatch(items);
+}
+
+List<LibraryEntry> parseSeasonEpisodes(Map<String, dynamic> data) {
   final items = <LibraryEntry>[];
   final seen = <int>{};
   final extra = (jsonList(data['section']) ?? []).expand(
@@ -246,8 +252,69 @@ Future<LibraryBatch> listSeasonEpisodes(int season) async {
       ),
     );
   }
-  if (items.isEmpty) throw const BilibiliError(-2, '该剧集暂无可播放分集');
-  return LibraryBatch(items);
+  return items;
+}
+
+class SeasonDetail {
+  final int id, type, ratingCount, views, danmaku, follows;
+  final String title, cover, description, rating, metadata, actors, staff;
+  final List<LibraryEntry> episodes;
+  bool followed;
+  SeasonDetail.fromJson(Map<String, dynamic> d)
+    : id = jsonInt(d['season_id']),
+      type = jsonInt(d['type'], fallback: 1),
+      title = jsonString(d['title']),
+      cover = jsonString(d['cover']),
+      description = jsonString(d['evaluate']),
+      rating = '${jsonMap(d['rating'])?['score'] ?? ''}',
+      ratingCount = jsonInt(jsonMap(d['rating'])?['count']),
+      views = jsonInt(jsonMap(d['stat'])?['views']),
+      danmaku = jsonInt(jsonMap(d['stat'])?['danmakus']),
+      follows = jsonInt(jsonMap(d['stat'])?['favorites']),
+      followed =
+          jsonBool(jsonMap(d['user_status'])?['follow']) ||
+          jsonInt(jsonMap(d['user_status'])?['follow']) > 0,
+      actors = jsonString(d['actors']),
+      staff = jsonString(d['staff']),
+      metadata = [
+        ...?(jsonList(d['styles'])?.map((v) => '$v')),
+        ...?(jsonList(d['areas'])?.map((v) => jsonString(jsonMap(v)?['name']))),
+        jsonString(jsonMap(d['publish'])?['pub_time']).split(' ').first,
+        jsonString(
+          jsonMap(d['new_ep'])?['desc'],
+          fallback: jsonString(jsonMap(d['new_ep'])?['index_show']),
+        ),
+      ].where((s) => s.isNotEmpty).join(' · '),
+      episodes = parseSeasonEpisodes(d);
+  bool get isDrama => type != 1 && type != 4;
+}
+
+Future<SeasonDetail> getSeasonDetail(int season) async => SeasonDetail.fromJson(
+  jsonMap(
+        await bilibiliRequest(
+          'GET',
+          'https://api.bilibili.com/pgc/view/web/season',
+          queries: {'season_id': season},
+        ),
+      ) ??
+      {},
+);
+
+Future<void> changeSeasonFollow(int season, {required bool follow}) async {
+  final csrf = (await loadCookie())
+      .where((c) => c.name == 'bili_jct')
+      .firstOrNull
+      ?.value;
+  if (csrf == null || csrf.isEmpty) {
+    throw const BilibiliError(-101, '请重新扫码登录后再操作');
+  }
+  await bilibiliRequest(
+    'POST',
+    'https://api.bilibili.com/pgc/web/follow/${follow ? 'add' : 'del'}',
+    contentType: Headers.formUrlEncodedContentType,
+    queries: {'season_id': season, 'csrf': csrf},
+    body: {'season_id': season, 'csrf': csrf},
+  );
 }
 
 class VideoFavoriteFolder {

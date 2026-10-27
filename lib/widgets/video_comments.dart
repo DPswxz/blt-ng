@@ -1,3 +1,4 @@
+import 'package:blt/utils/request_scope.dart';
 import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/consts/color.dart';
 import 'package:blt/utils/ui_scale.dart';
@@ -26,7 +27,15 @@ class VideoCommentsPanel extends StatefulWidget {
 }
 
 class _VideoCommentsPanelState extends State<VideoCommentsPanel> {
+  final _requests = RequestScope();
   final _items = <VideoComment>[];
+  @override
+  void dispose() {
+    _seq++;
+    _requests.dispose();
+    super.dispose();
+  }
+
   int _page = 0, _total = 0, _sort = 1, _seq = 0;
   bool _loading = false, _more = true;
   String? _error;
@@ -45,14 +54,17 @@ class _VideoCommentsPanelState extends State<VideoCommentsPanel> {
       _error = null;
     });
     try {
-      final result =
-          await (widget.loader?.call(next, _sort, widget.root?.id) ??
-              getComments(
-                widget.avid,
-                page: next,
-                sort: _sort,
-                root: widget.root?.id,
-              ));
+      final result = await _requests.run(
+        () =>
+            (widget.loader?.call(next, _sort, widget.root?.id) ??
+            getComments(
+              widget.avid,
+              page: next,
+              sort: _sort,
+              root: widget.root?.id,
+            )),
+        replace: reset,
+      );
       if (!mounted || seq != _seq) return;
       setState(() {
         if (reset) _items.clear();
@@ -292,11 +304,11 @@ class _CommentCard extends StatefulWidget {
 
 class _CommentCardState extends State<_CommentCard> {
   bool _busy = false;
-  Future<void> _vote(bool dislike) async {
+  Future<void> _vote() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await voteComment(widget.avid, widget.comment, dislike: dislike);
+      await voteComment(widget.avid, widget.comment, dislike: false);
     } catch (e) {
       if (mounted) showAppError(context, e);
     } finally {
@@ -355,15 +367,7 @@ class _CommentCardState extends State<_CommentCard> {
               Icons.thumb_up_alt_outlined,
               '${c.likes}',
               c.action == 1,
-              () => _vote(false),
-            ),
-            SizedBox(width: 14 * ui),
-            _action(
-              ui,
-              Icons.thumb_down_alt_outlined,
-              '踩',
-              c.action == 2,
-              () => _vote(true),
+              _vote,
             ),
             const Spacer(),
             if (widget.onOpen != null)

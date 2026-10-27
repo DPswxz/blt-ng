@@ -1,3 +1,8 @@
+import 'package:blt/storages/search_history.dart';
+import 'package:blt/pages/search.dart';
+import 'package:blt/widgets/pink_style.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:blt/pages/pages.dart' as app;
 import 'package:blt/storages/auth.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,7 +43,7 @@ void main() {
     expect(find.text('推荐视频A'), findsOneWidget);
   });
 
-  testWidgets('头像打开个人页面并保留侧栏，返回首页', (tester) async {
+  testWidgets('头像打开个人页面并保留侧栏，返回不切换栏目', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
@@ -49,7 +54,224 @@ void main() {
     expect(find.byType(Sidebar), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('推荐视频A'), findsOneWidget);
+    expect(find.text('账号管理'), findsOneWidget);
+    expect(find.text('退出 BLT？'), findsNothing);
+  });
+
+  testWidgets('侧栏搜索未切页向右正常进入当前内容，切页后向右进输入框，最后可直接确认退出', (tester) async {
+    loginInfoNotifier.value = LoginInfo.login(
+      mid: 1,
+      nickname: '测试',
+      avatar: '',
+    );
+    final http = mockHttp();
+    http.onGet(
+      _rcmdUrl,
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'item': [feedVideoJson(title: '推荐视频A')],
+        },
+      }),
+    );
+    http.onGet(
+      'https://api.bilibili.com/x/web-interface/wbi/search/square',
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'trending': {'list': []},
+        },
+      }),
+    );
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    final text = find.text('搜索');
+    final focus = find.ancestor(of: text, matching: find.byType(Focus)).first;
+    tester.widget<Focus>(focus).focusNode?.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    await flush(tester);
+    expect(find.byType(TextField), findsNothing);
+    expect(
+      sidebar.items.singleWhere((e) => e.label == '搜索').focusAnchor!.hasFocus,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<Sidebar>(find.byType(Sidebar))
+          .items
+          .singleWhere((e) => e.label == '首页')
+          .selected,
+      isTrue,
+    );
+    tester.widget<Focus>(focus).focusNode?.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await flush(tester);
+    expect(
+      tester
+          .widget<Sidebar>(find.byType(Sidebar))
+          .items
+          .singleWhere((e) => e.label == '搜索')
+          .selected,
+      isTrue,
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await flush(tester);
+    final input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.focusNode!.hasFocus, isTrue);
+    expect(input.readOnly, isTrue);
+    expect(sidebar.footer!.label, '退出');
+    sidebar.footer!.onTap();
+    await tester.pumpAndSettle();
+    expect(find.text('退出 BLT？'), findsOneWidget);
+    await tester.tap(find.text('继续观看'));
+    await tester.pumpAndSettle();
+    expect(find.text('退出 BLT？'), findsNothing);
+    var exits = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'SystemNavigator.pop') exits++;
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    sidebar.footer!.onTap();
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(PinkButton, '退出'));
+    await tester.pumpAndSettle();
+    expect(exits, 1);
+  });
+
+  testWidgets('内容左侧返回当前搜索图标，个人页返回头像', (tester) async {
+    loginInfoNotifier.value = LoginInfo.login(
+      mid: 1,
+      nickname: '测试',
+      avatar: '',
+    );
+    final http = mockHttp();
+    http.onGet(
+      _rcmdUrl,
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'item': [feedVideoJson()],
+        },
+      }),
+    );
+    http.onGet(
+      'https://api.bilibili.com/x/web-interface/wbi/search/square',
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'trending': {'list': []},
+        },
+      }),
+    );
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.tap(find.text('搜索'));
+    await flush(tester);
+    final input = tester.widget<TextField>(find.byType(TextField));
+    input.focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    var sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    expect(
+      sidebar.items
+          .singleWhere((item) => item.label == '搜索')
+          .focusAnchor!
+          .hasFocus,
+      isTrue,
+    );
+    loginInfoNotifier.value = LoginInfo.notLogin;
+    await tester.pump();
+    sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    sidebar.onAvatarTap();
+    await flush(tester);
+    final buttonFocus = find
+        .ancestor(of: find.text('账号管理'), matching: find.byType(Focus))
+        .first;
+    tester.widget<Focus>(buttonFocus).focusNode!.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    expect(sidebar.avatarFocusAnchor!.hasFocus, isTrue);
+  });
+
+  testWidgets('离开搜索销毁结果页，再进为空闲页，搜索历史仍可点击', (tester) async {
+    loginInfoNotifier.value = LoginInfo.login(
+      mid: 1,
+      nickname: '测试',
+      avatar: '',
+    );
+    final http = mockHttp();
+    http.onGet(
+      _rcmdUrl,
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'item': [feedVideoJson()],
+        },
+      }),
+    );
+    http.onGet(
+      'https://api.bilibili.com/x/web-interface/wbi/search/square',
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'trending': {'list': []},
+        },
+      }),
+    );
+    http.onGet(
+      'https://api.bilibili.com/x/web-interface/wbi/search/type',
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'numResults': 1,
+          'numPages': 1,
+          'result': [
+            {
+              'type': 'video',
+              'aid': 9,
+              'title': '临时视频结果',
+              'pic': '',
+              'duration': '01:00',
+              'mid': 1,
+            },
+          ],
+        },
+      }),
+    );
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.tap(find.text('搜索'));
+    await flush(tester);
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), '测试查询');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await flush(tester);
+    expect(find.text('临时视频结果'), findsOneWidget);
+    await tester.tap(find.text('首页'));
+    await flush(tester);
+    expect(find.byType(SearchPage, skipOffstage: false), findsNothing);
+    expect(await SearchHistory.load(), contains('测试查询'));
+    await tester.tap(find.text('搜索'));
+    await flush(tester);
+    expect(find.text('临时视频结果'), findsNothing);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      isEmpty,
+    );
+    expect(find.text('测试查询'), findsOneWidget);
   });
 
   testWidgets('点击搜索切换到搜索页', (tester) async {
@@ -112,20 +334,17 @@ void main() {
 
     expect(find.text('历史视频A'), findsOneWidget);
   });
-  testWidgets('首页返回显示退出确认，取消保留首页', (tester) async {
+  testWidgets('首页返回保留首页，不显示退出确认', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('退出 BLT？'), findsOneWidget);
-    await tester.tap(find.text('继续观看'));
-    await tester.pumpAndSettle();
     expect(find.text('退出 BLT？'), findsNothing);
     expect(find.text('推荐视频A'), findsOneWidget);
   });
 
-  testWidgets('搜索页返回先回首页，不直接退出应用', (tester) async {
+  testWidgets('搜索页返回保留搜索栏目，不退出应用', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
@@ -133,7 +352,8 @@ void main() {
     await flush(tester);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('推荐视频A'), findsOneWidget);
+    final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+    expect(sidebar.items.singleWhere((e) => e.label == '搜索').selected, isTrue);
     expect(find.text('退出 BLT？'), findsNothing);
   });
   testWidgets('设置在主页面切换并保留侧栏，可返回首页', (tester) async {
@@ -147,6 +367,10 @@ void main() {
     expect(find.text('进入视频默认画质'), findsOneWidget);
     final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
     expect(sidebar.items.singleWhere((e) => e.label == '设置').selected, isTrue);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('偏好设置'), findsOneWidget);
+    expect(find.text('退出 BLT？'), findsNothing);
     await tester.tap(find.text('首页'));
     await flush(tester);
     expect(find.text('推荐视频A'), findsOneWidget);

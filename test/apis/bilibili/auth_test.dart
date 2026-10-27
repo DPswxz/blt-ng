@@ -19,7 +19,8 @@ void main() {
     test('正常解析', () {
       final qr = QR.fromJson({
         'qrcode_key': 'key-1',
-        'url': 'https://passport.bilibili.com/h5-app/passport/login/scan?qrcode_key=key-1',
+        'url':
+            'https://passport.bilibili.com/h5-app/passport/login/scan?qrcode_key=key-1',
       });
       expect(qr.key, 'key-1');
     });
@@ -193,7 +194,7 @@ void main() {
 
     test('正常刷新返回 cookie 与新 refresh_token', () async {
       SharedPreferences.setMockInitialValues({
-        'bilibili_cookie': 'bili_jct=csrf-token',
+        'bilibili_cookie': 'bili_jct=csrf-token; buvid3=old-device-id',
       });
       final adapter = _mock();
       adapter.onPost(
@@ -213,8 +214,12 @@ void main() {
       );
 
       final (cookies, refreshToken) = await refreshCookie('csrf', 'rt-1');
-      expect(cookies.single.name, 'SESSDATA');
-      expect(cookies.single.value, 'new');
+      expect(cookies.first.name, 'SESSDATA');
+      expect(cookies.first.value, 'new');
+      expect(
+        cookies.where((c) => c.name == 'buvid3').single.value,
+        'old-device-id',
+      );
       expect(refreshToken, 'rt-2');
     });
 
@@ -248,10 +253,7 @@ void main() {
         data: Matchers.any,
         (server) => server.reply(
           200,
-          {
-            'code': 0,
-            'data': {},
-          },
+          {'code': 0, 'data': {}},
           headers: {
             Headers.contentTypeHeader: [Headers.jsonContentType],
             'set-cookie': ['SESSDATA=new'],

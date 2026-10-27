@@ -1,7 +1,11 @@
+import 'package:blt/utils/request_scope.dart';
 import 'package:blt/apis/bilibili/error.dart';
 import 'package:blt/models/pbs/dm.pb.dart';
 import 'package:blt/models/video.dart' show Video;
-import 'package:blt/storages/auth.dart' show loadCookie;
+import 'package:blt/storages/auth.dart'
+    show loadCookie, saveCookie, authSessionVersion;
+import 'package:blt/apis/bilibili/auth.dart' show getBuvids;
+import 'dart:io' show Cookie;
 import 'package:blt/utils/json.dart';
 import 'package:blt/utils/log.dart';
 import 'package:dio/dio.dart';
@@ -261,6 +265,7 @@ Future<DmSegMobileReply> getDanmaku(int cid, int segmentIndex) async {
     'https://api.bilibili.com/x/v2/dm/web/seg.so',
     queryParameters: queryParams,
     options: Options(responseType: ResponseType.bytes),
+    cancelToken: currentRequestToken,
   );
   final bytes = response.data;
   if (bytes is! List<int>) {
@@ -316,9 +321,26 @@ Future<void> insertCoin({
   int count = 1,
   bool like = false,
 }) async {
-  final csrf = (await loadCookie())
-      .firstWhere((c) => c.name == 'bili_jct')
-      .value;
+  if (count < 1 || count > 2) throw const BilibiliError(34003, '请选择1或2枚硬币');
+  final generation = authSessionVersion;
+  final cookies = await loadCookie();
+  final csrf = cookies.where((c) => c.name == 'bili_jct').firstOrNull?.value;
+  if (csrf == null || csrf.isEmpty) {
+    throw const BilibiliError(-101, '请重新扫码登录后投币');
+  }
+  if (!cookies.any((c) => c.name == 'buvid3' && c.value.isNotEmpty)) {
+    final (b3, b4) = await getBuvids();
+    if (generation != authSessionVersion) {
+      throw const BilibiliError(-2, '账号已切换，请重试');
+    }
+    if (b3.isEmpty) throw const BilibiliError(-403, '设备凭据获取失败，请稍后重试');
+    cookies.removeWhere((c) => c.name == 'buvid3' || c.name == 'buvid4');
+    cookies.addAll([
+      Cookie('buvid3', b3),
+      if (b4.isNotEmpty) Cookie('buvid4', b4),
+    ]);
+    await saveCookie(cookies);
+  }
   Map<String, dynamic> body = {
     'multiply': count,
     'select_like': like ? 1 : 0,
@@ -329,10 +351,28 @@ Future<void> insertCoin({
   } else {
     body['bvid'] = bvid;
   }
-  await bilibiliRequest(
-    'POST',
-    'https://api.bilibili.com/x/web-interface/coin/add',
-    contentType: Headers.formUrlEncodedContentType,
-    body: body,
-  );
+  try {
+    await bilibiliRequest(
+      'POST',
+      'https://api.bilibili.com/x/web-interface/coin/add',
+      contentType: Headers.formUrlEncodedContentType,
+      headers: {
+        'Origin': 'https://www.bilibili.com',
+        'Referer': 'https://www.bilibili.com/video/${bvid ?? 'av$avid'}',
+      },
+      body: body,
+    );
+  } on BilibiliError catch (e) {
+    final hint = switch (e.code) {
+      -104 => '硬币余额不足',
+      -111 => '登录凭据已失效，请重新扫码登录',
+      -403 => 'B站拒绝投币，请检查账号状态或稍后重试',
+      34002 => '不能给自己发布的视频投币',
+      34003 => '投币数量不符合该视频限制，请选择1枚',
+      34004 => '投币间隔太短，请稍后重试',
+      34005 => '该视频已达到投币上限',
+      _ => e.message,
+    };
+    throw BilibiliError(e.code, '$hint（错误码 ${e.code}）');
+  }
 }

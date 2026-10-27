@@ -9,43 +9,92 @@ import 'package:cached_network_image/cached_network_image.dart'
         LoadingErrorWidgetBuilder,
         PlaceholderWidgetBuilder;
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 final _log = log('image');
 
-// bilibili网络图片提供方，带上了header
-class BilibiliNetworkImageProvider extends CachedNetworkImageProvider {
-  BilibiliNetworkImageProvider(super.url)
-    : super(headers: bilibiliHttpClient.options.headers.cast<String, String>());
+// A single bounded disk cache and a small download pool prevent page-switch bursts.
+class _BilibiliCacheManager extends CacheManager with ImageCacheManager {
+  _BilibiliCacheManager()
+    : super(
+        Config(
+          'libCachedImageData',
+          stalePeriod: const Duration(days: 7),
+          maxNrOfCacheObjects: 160,
+          fileService: HttpFileService()..concurrentFetches = 4,
+        ),
+      );
 }
 
-// bilibili网络图片，带上了header。
-//
-// 加载中/失败都有兜底样式：图片请求失败时不冒泡未捕获异常。
-class BilibiliNetworkImage extends CachedNetworkImage {
-  BilibiliNetworkImage(
-    String url, {
-    super.key,
-    PlaceholderWidgetBuilder? placeholder,
-    LoadingErrorWidgetBuilder? errorWidget,
-  }) : super(
-         imageUrl: url,
-         fit: BoxFit.cover,
-         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
-         placeholder: placeholder ?? _defaultPlaceholder,
-         errorWidget: errorWidget ?? _defaultErrorWidget,
-       );
+final bilibiliImageCache = _BilibiliCacheManager();
 
-  static Widget _defaultPlaceholder(BuildContext context, String url) {
-    return Container(color: Colors.black.withValues(alpha: 0.04));
+int imageDecodeWidth(double logicalWidth, double devicePixelRatio) {
+  final width = (logicalWidth * devicePixelRatio).ceil();
+  return ((width.clamp(128, 960) + 63) ~/ 64) * 64;
+}
+
+String thumbnailUrl(String url, int width) {
+  final uri = Uri.tryParse(url);
+  if (uri == null ||
+      !uri.host.endsWith('.hdslb.com') ||
+      uri.path.contains('@') ||
+      uri.hasQuery ||
+      uri.hasFragment) {
+    return url;
   }
+  return '$url@${width}w.webp';
+}
 
+class BilibiliNetworkImageProvider extends CachedNetworkImageProvider {
+  BilibiliNetworkImageProvider(String url)
+    : super(
+        thumbnailUrl(url, 192),
+        maxWidth: 192,
+        cacheManager: bilibiliImageCache,
+        headers: bilibiliHttpClient.options.headers.cast<String, String>(),
+      );
+}
+
+class BilibiliNetworkImage extends StatelessWidget {
+  final String url;
+  final PlaceholderWidgetBuilder? placeholder;
+  final LoadingErrorWidgetBuilder? errorWidget;
+  const BilibiliNetworkImage(
+    this.url, {
+    super.key,
+    this.placeholder,
+    this.errorWidget,
+  });
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = imageDecodeWidth(
+        constraints.hasBoundedWidth ? constraints.maxWidth : 640,
+        MediaQuery.devicePixelRatioOf(context),
+      );
+      return CachedNetworkImage(
+        imageUrl: thumbnailUrl(url, width),
+        cacheManager: bilibiliImageCache,
+        memCacheWidth: width,
+        maxWidthDiskCache: width,
+        fit: BoxFit.cover,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
+        placeholder: placeholder ?? _defaultPlaceholder,
+        errorWidget: errorWidget ?? _defaultErrorWidget,
+      );
+    },
+  );
+  static Widget _defaultPlaceholder(BuildContext context, String url) =>
+      ColoredBox(color: Colors.black.withValues(alpha: 0.04));
   static Widget _defaultErrorWidget(
     BuildContext context,
     String url,
     Object error,
   ) {
-    _log.w('图片加载失败 $url (${error.runtimeType})');
-    return Container(color: Colors.black.withValues(alpha: 0.04));
+    _log.w('图片加载失败 (${error.runtimeType})');
+    return ColoredBox(color: Colors.black.withValues(alpha: 0.04));
   }
 }
 
@@ -75,7 +124,7 @@ class BilibiliAvatar extends CircleAvatar {
          backgroundImage: AssetImage(Images.noface),
          foregroundImage: url == null
              ? null
-             : BilibiliNetworkImageProvider(url),
+             : ResizeImage(BilibiliNetworkImageProvider(url), width: 192),
          onForegroundImageError: url == null
              ? null
              : (onError ?? _defaultAvatarError),

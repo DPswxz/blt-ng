@@ -1,3 +1,4 @@
+import 'package:blt/utils/sidebar_focus_policy.dart';
 import 'package:blt/consts/color.dart';
 import 'package:blt/icons/iconfont.dart';
 import 'package:blt/pages/dynamic.dart';
@@ -14,7 +15,7 @@ import 'package:blt/widgets/tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:blt/widgets/pink_style.dart';
-import 'package:flutter_lazy_indexed_stack/flutter_lazy_indexed_stack.dart';
+import 'package:blt/widgets/bounded_page_stack.dart';
 
 class _PageItem {
   final IconData icon;
@@ -50,6 +51,15 @@ class Page extends StatefulWidget {
 
 class _PageState extends State<Page> {
   bool _exitDialogOpen = false;
+  final _sidebarRegion = FocusNode(
+    debugLabel: 'main-sidebar',
+    canRequestFocus: false,
+  );
+  final _contentRegion = FocusNode(
+    debugLabel: 'main-content',
+    canRequestFocus: false,
+  );
+  late final SidebarFocusPolicy _focusPolicy;
   final _searchKey = GlobalKey<SearchPageState>();
   late final List<_PageItem> _tabs;
   late ValueNotifier<int> _currentPageIndex;
@@ -97,10 +107,19 @@ class _PageState extends State<Page> {
     ];
     _pageFocusNodes = _tabs.map((e) => FocusNode()).toList();
     _currentPageIndex = ValueNotifier(_tabs.lastIndexWhere((e) => e.homePage));
+    _focusPolicy = SidebarFocusPolicy(
+      sidebar: _sidebarRegion,
+      content: _contentRegion,
+      activeTarget: () => _pageFocusNodes[_currentPageIndex.value].descendants
+          .where((node) => node.canRequestFocus && !node.skipTraversal)
+          .firstOrNull,
+    );
   }
 
   @override
   void dispose() {
+    _sidebarRegion.dispose();
+    _contentRegion.dispose();
     _currentPageIndex.dispose();
     for (var node in _pageFocusNodes) {
       node.dispose();
@@ -137,15 +156,13 @@ class _PageState extends State<Page> {
 
   Future<void> _handleBack() async {
     if (_exitDialogOpen) return;
-    final home = _tabs.lastIndexWhere((tab) => tab.homePage);
-    if (_tabs[_currentPageIndex.value].child is SearchPage &&
-        (_searchKey.currentState?.dismissInput() ?? false)) {
-      return;
+    if (_tabs[_currentPageIndex.value].child is SearchPage) {
+      _searchKey.currentState?.dismissInput();
     }
-    if (_currentPageIndex.value != home) {
-      _currentPageIndex.value = home;
-      return;
-    }
+  }
+
+  Future<void> _confirmExit() async {
+    if (_exitDialogOpen) return;
     _exitDialogOpen = true;
     final ui = context.ui;
     final exit = await showDialog<bool>(
@@ -210,48 +227,80 @@ class _PageState extends State<Page> {
         resizeToAvoidBottomInset: false,
         body: Container(
           decoration: const BoxDecoration(gradient: pageBackgroundGradient),
-          child: Row(
-            children: [
-              ValueListenableBuilder(
-                valueListenable: _currentPageIndex,
-                builder: (context, index, _) => Sidebar(
-                  onAvatarTap: _onAvatarTapped,
-                  avatar: ListenableBuilder(
-                    listenable: loginInfoNotifier,
-                    builder: (context, child) => BilibiliAvatar(
-                      loginInfoNotifier.value.avatar,
-                      radius: 46 * ui,
+          child: FocusTraversalGroup(
+            policy: _focusPolicy,
+            child: Row(
+              children: [
+                ValueListenableBuilder(
+                  valueListenable: _currentPageIndex,
+                  builder: (context, index, _) => Focus(
+                    focusNode: _sidebarRegion,
+                    canRequestFocus: false,
+                    child: Sidebar(
+                      onAvatarTap: _onAvatarTapped,
+                      avatarFocusAnchor: _pageFocusNodes.last,
+                      avatar: ListenableBuilder(
+                        listenable: loginInfoNotifier,
+                        builder: (context, child) => BilibiliAvatar(
+                          loginInfoNotifier.value.avatar,
+                          radius: 46 * ui,
+                        ),
+                      ),
+                      footer: SidebarItemData(
+                        icon: Icons.exit_to_app_rounded,
+                        boldIcon: true,
+                        label: '退出',
+                        selected: false,
+                        onTap: _confirmExit,
+                      ),
+                      items: [
+                        for (var i = 0; i < _tabs.length - 1; i++)
+                          SidebarItemData(
+                            focusAnchor: _pageFocusNodes[i],
+                            icon: _tabs[i].icon,
+                            boldIcon: _tabs[i].child is DynamicPage,
+                            label: _tabs[i].label,
+                            selected: i == index,
+                            autofocus: i == index,
+                            onTap: () => _onTabTapped(_tabs[i]),
+                            onRight: index == i && _tabs[i].child is SearchPage
+                                ? () {
+                                    if (_currentPageIndex.value != i) return;
+                                    _searchKey.currentState?.focusInput();
+                                  }
+                                : null,
+                          ),
+                      ],
                     ),
                   ),
-                  items: [
-                    for (var i = 0; i < _tabs.length - 1; i++)
-                      SidebarItemData(
-                        icon: _tabs[i].icon,
-                        label: _tabs[i].label,
-                        selected: i == index,
-                        autofocus: i == index,
-                        onTap: () => _onTabTapped(_tabs[i]),
-                      ),
-                  ],
                 ),
-              ),
-              Expanded(
-                child: ValueListenableBuilder(
-                  valueListenable: _currentPageIndex,
-                  builder: (context, index, _) {
-                    return ValueListenableBuilder<LoginInfo>(
-                      valueListenable: loginInfoNotifier,
-                      builder: (context, login, _) => LazyIndexedStack(
-                        // 登录状态变化时重建页面，避免残留在上一个账号的数据
-                        key: ValueKey(login.mid),
-                        index: index,
-                        children: _tabs.map((tab) => tab.child).toList(),
-                      ),
-                    );
-                  },
+                Expanded(
+                  child: Focus(
+                    focusNode: _contentRegion,
+                    canRequestFocus: false,
+                    child: ValueListenableBuilder(
+                      valueListenable: _currentPageIndex,
+                      builder: (context, index, _) {
+                        return ValueListenableBuilder<LoginInfo>(
+                          valueListenable: loginInfoNotifier,
+                          builder: (context, login, _) => BoundedPageStack(
+                            // 登录状态变化时重建页面，避免残留在上一个账号的数据
+                            key: ValueKey(login.mid),
+                            index: index,
+                            discardWhenInactive: {
+                              _tabs.indexWhere(
+                                (tab) => tab.child is SearchPage,
+                              ),
+                            },
+                            children: _tabs.map((tab) => tab.child).toList(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

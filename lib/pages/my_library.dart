@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'package:blt/consts/color.dart';
+import 'package:blt/pages/season_detail.dart';
+import 'package:blt/utils/request_scope.dart';
 import 'package:flutter/services.dart';
 import 'package:blt/widgets/account_dialog.dart' show confirmAccountAction;
 import 'package:blt/apis/bilibili/library.dart';
@@ -18,8 +22,9 @@ import 'package:get/get.dart';
 Future<void> playLibraryEpisode(
   BuildContext context,
   LibraryEntry season,
-  LibraryEntry episode,
-) async {
+  LibraryEntry episode, {
+  List<LibraryEntry>? episodes,
+}) async {
   try {
     if ((episode.aid ?? 0) <= 0 || (episode.cid ?? 0) <= 0) {
       throw StateError('该分集暂时无法播放');
@@ -31,7 +36,7 @@ Future<void> playLibraryEpisode(
     final video = Video(
       avid: episode.aid!,
       bvid: '',
-      title: '${season.title} · ${episode.title}',
+      title: season.title,
       cover: episode.cover,
       desc: '',
       duration: Duration.zero,
@@ -41,15 +46,7 @@ Future<void> playLibraryEpisode(
       userAvatar: '',
       publishTime: DateTime.fromMillisecondsSinceEpoch(0),
       cid: episode.cid!,
-      episodes: [
-        Episode(
-          index: 1,
-          cid: episode.cid!,
-          episodeId: episode.id,
-          title: episode.title,
-          duration: Duration.zero,
-        ),
-      ],
+      episodes: libraryPlaybackEpisodes(episodes ?? [episode]),
     );
     Get.to(
       () => VideoPlayerPage(
@@ -69,6 +66,19 @@ Future<void> playLibraryEpisode(
 
 typedef LibraryLoader = Future<LibraryBatch> Function(int page);
 
+List<Episode> libraryPlaybackEpisodes(List<LibraryEntry> entries) => [
+  for (var i = 0; i < entries.length; i++)
+    if ((entries[i].aid ?? 0) > 0 && (entries[i].cid ?? 0) > 0)
+      Episode(
+        index: i + 1,
+        aid: entries[i].aid,
+        cid: entries[i].cid!,
+        episodeId: entries[i].id,
+        title: entries[i].title,
+        duration: Duration.zero,
+      ),
+];
+
 class MySubscriptions extends StatefulWidget {
   final int mid;
   const MySubscriptions({super.key, required this.mid});
@@ -78,22 +88,10 @@ class MySubscriptions extends StatefulWidget {
 
 class _MySubscriptionsState extends State<MySubscriptions> {
   int _type = 1;
-  LibraryEntry? _season;
-  Future<void> _play(LibraryEntry episode) =>
-      playLibraryEpisode(context, _season!, episode);
-
+  final _collection = LibraryCollectionController();
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
-    if (_season != null) {
-      return LibraryCollectionPane(
-        key: ValueKey('season-${_season!.id}'),
-        title: _season!.title,
-        loader: (_) => listSeasonEpisodes(_season!.id),
-        onBack: () => setState(() => _season = null),
-        onOpen: _play,
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -121,9 +119,17 @@ class _MySubscriptionsState extends State<MySubscriptions> {
           child: LibraryCollectionPane(
             key: ValueKey('follow-$_type'),
             title: _type == 1 ? '我的追番' : '我的追剧',
+            controller: _collection,
             loader: (page) =>
                 listFollowedSeasons(widget.mid, type: _type, page: page),
-            onOpen: (item) => setState(() => _season = item),
+            onOpen: (item) async {
+              final followed = await openSeasonDetail(
+                context,
+                item,
+                knownFollowed: true,
+              );
+              if (mounted && followed == false) _collection.remove(item.id);
+            },
           ),
         ),
       ],
@@ -139,69 +145,167 @@ class MyFavorites extends StatefulWidget {
 }
 
 class _MyFavoritesState extends State<MyFavorites> {
-  LibraryEntry? _folder;
-  int _folderRevision = 0;
   @override
-  Widget build(BuildContext context) {
-    if (_folder != null) {
-      return LibraryCollectionPane(
-        key: ValueKey('folder-${_folder!.id}-$_folderRevision'),
-        title: _folder!.title,
-        onBack: () => setState(() => _folder = null),
-        loader: (page) => listFavoriteVideos(_folder!.id, page: page),
-        onRemove: (item) async {
-          await changeVideoFavorite(item.video!.avid, _folder!.id, add: false);
-        },
-        onOpen: (item) async {
-          final video = item.video;
-          if (video != null) {
-            await Get.to(
-              () => VideoDetailPageWrap(
-                avid: video.avid,
-                bvid: video.bvid.isEmpty ? null : video.bvid,
-                cid: video.cid,
-              ),
-            );
-            if (mounted) setState(() => _folderRevision++);
-          }
-        },
-      );
-    }
-    return LibraryCollectionPane(
-      title: '我的收藏夹',
-      loader: (_) => listFavoriteFolders(widget.mid),
-      onOpen: (item) => setState(() => _folder = item),
-    );
-  }
+  Widget build(BuildContext context) => LibraryCollectionPane(
+    title: '我的收藏夹',
+    loader: (_) => listFavoriteFolders(widget.mid),
+    onOpen: (folder) => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(gradient: pageBackgroundGradient),
+            padding: EdgeInsets.all(24 * context.ui),
+            child: LibraryCollectionPane(
+              title: folder.title,
+              onBack: () => Navigator.of(routeContext).pop(),
+              loader: (page) => listFavoriteVideos(folder.id, page: page),
+              onRemove: (item) =>
+                  changeVideoFavorite(item.video!.avid, folder.id, add: false),
+              onOpen: (item) async {
+                final video = item.video;
+                if (video == null) return;
+                await Get.to(
+                  () => VideoDetailPageWrap(
+                    avid: video.avid,
+                    bvid: video.bvid.isEmpty ? null : video.bvid,
+                    cid: video.cid,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class LibraryCollectionController {
+  void Function(int)? _remove;
+  void remove(int id) => _remove?.call(id);
 }
 
 class LibraryCollectionPane extends StatefulWidget {
   final String title;
   final LibraryLoader loader;
-  final ValueChanged<LibraryEntry> onOpen;
+  final FutureOr<void> Function(LibraryEntry) onOpen;
   final VoidCallback? onBack;
+  final bool showHeader;
   final Future<void> Function(LibraryEntry)? onRemove;
+  final LibraryCollectionController? controller;
   const LibraryCollectionPane({
     super.key,
     required this.title,
     required this.loader,
     required this.onOpen,
     this.onBack,
+    this.showHeader = true,
     this.onRemove,
+    this.controller,
   });
   @override
   State<LibraryCollectionPane> createState() => _LibraryCollectionPaneState();
 }
 
 class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
+  final _requests = RequestScope();
   final _items = <LibraryEntry>[];
+  final _entryFocus = <int, FocusNode>{};
+  final _scroll = ScrollController();
+  final _backFocus = FocusNode(canRequestFocus: false);
+  bool _initialFocusPending = true;
+  bool _opening = false;
+
+  void _focusControl(FocusNode anchor) {
+    if (!mounted ||
+        !TickerMode.valuesOf(context).enabled ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    final target = anchor.descendants
+        .where((node) => node.canRequestFocus && !node.skipTraversal)
+        .firstOrNull;
+    target?.requestFocus();
+  }
+
+  void _focusInitialItem() {
+    if (!_initialFocusPending) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _loading || !TickerMode.valuesOf(context).enabled) return;
+      if (_items.isNotEmpty) {
+        _initialFocusPending = false;
+        _focusControl(_entryFocus[_items.first.id]!);
+      } else if (widget.onBack != null && widget.showHeader) {
+        _focusControl(_backFocus);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller?._remove == _removeEntry) {
+      widget.controller?._remove = null;
+    }
+    _generation++;
+    _requests.dispose();
+    _scroll.dispose();
+    for (final node in _entryFocus.values) {
+      node.dispose();
+    }
+    _backFocus.dispose();
+    super.dispose();
+  }
+
   int _page = 0, _generation = 0;
   bool _loading = false, _more = false;
   String? _error;
   @override
   void initState() {
     super.initState();
+    widget.controller?._remove = _removeEntry;
     _load(reset: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant LibraryCollectionPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      if (oldWidget.controller?._remove == _removeEntry) {
+        oldWidget.controller?._remove = null;
+      }
+      widget.controller?._remove = _removeEntry;
+    }
+  }
+
+  void _removeEntry(int id) {
+    if (mounted) setState(() => _items.removeWhere((entry) => entry.id == id));
+  }
+
+  Future<void> _openEntry(LibraryEntry item) async {
+    if (_opening) return;
+    _opening = true;
+    final anchor = _entryFocus[item.id];
+    final oldIndex = _items.indexWhere((entry) => entry.id == item.id);
+    try {
+      await widget.onOpen(item);
+    } catch (e) {
+      if (mounted) showAppError(context, e);
+    } finally {
+      _opening = false;
+      if (mounted && anchor != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_items.any((entry) => entry.id == item.id)) {
+            _focusControl(anchor);
+          } else if (_items.isNotEmpty) {
+            final next = _items[oldIndex.clamp(0, _items.length - 1)];
+            final target = _entryFocus[next.id];
+            if (target != null) _focusControl(target);
+          }
+        });
+        setState(() {});
+      }
+    }
   }
 
   bool _removing = false;
@@ -233,7 +337,10 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
       _error = null;
     });
     try {
-      final result = await widget.loader(next);
+      final result = await _requests.run(
+        () => widget.loader(next),
+        replace: reset,
+      );
       if (!mounted || version != _generation) return;
       setState(() {
         if (reset) _items.clear();
@@ -247,138 +354,175 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
         setState(() => _error = '加载失败，请检查登录状态或网络后重试');
       }
     } finally {
-      if (mounted && version == _generation) setState(() => _loading = false);
+      if (mounted && version == _generation) {
+        setState(() => _loading = false);
+        if (reset) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final ids = _items.map((e) => e.id).toSet();
+            for (final id in _entryFocus.keys.toList()) {
+              if (!ids.contains(id)) _entryFocus.remove(id)?.dispose();
+            }
+          });
+        }
+        _focusInitialItem();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14 * ui, vertical: 12 * ui),
-          child: Row(
-            children: [
-              if (widget.onBack != null) ...[
-                PinkButton(
-                  ui: ui,
-                  height: 42,
-                  fontSize: 20,
-                  horizontalPadding: 18,
-                  label: '返回',
-                  icon: Icons.arrow_back_rounded,
-                  onPressed: widget.onBack!,
-                ),
-                SizedBox(width: 18 * ui),
-              ],
-              Expanded(
-                child: Text(
-                  widget.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 26 * ui,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+    return PopScope(
+      canPop: widget.onBack == null || !widget.showHeader,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && widget.onBack != null && widget.showHeader) {
+          _focusControl(_backFocus);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.showHeader)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 14 * ui,
+                vertical: 12 * ui,
               ),
-              if (widget.onRemove != null) ...[
-                Text(
-                  '菜单键 / 长按移除',
-                  style: TextStyle(fontSize: 18 * ui, color: Colors.black54),
-                ),
-                SizedBox(width: 16 * ui),
-              ],
-              PinkButton(
-                ui: ui,
-                height: 42,
-                fontSize: 20,
-                horizontalPadding: 18,
-                label: '刷新',
-                icon: Icons.refresh_rounded,
-                onPressed: () => _load(reset: true),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _items.isEmpty
-              ? Center(
-                  child: _loading
-                      ? const CircularProgressIndicator()
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _error ?? '暂无内容',
-                              style: TextStyle(
-                                fontSize: 23 * ui,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            if (_error != null || _more) ...[
-                              SizedBox(height: 18 * ui),
-                              PinkButton(
-                                ui: ui,
-                                label: _error != null ? '重试' : '加载下一页',
-                                onPressed: () => _load(reset: _error != null),
-                              ),
-                            ],
-                          ],
-                        ),
-                )
-              : GridView.builder(
-                  padding: EdgeInsets.all(14 * ui),
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 480 * ui,
-                    childAspectRatio: 1.3,
-                    mainAxisSpacing: 24 * ui,
-                    crossAxisSpacing: 24 * ui,
-                  ),
-                  itemCount:
-                      _items.length +
-                      (_more || _loading || _error != null ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == _items.length) {
-                      return Center(
-                        child: _loading
-                            ? const CircularProgressIndicator()
-                            : PinkButton(
-                                ui: ui,
-                                label: _error != null ? '重试' : '加载更多',
-                                onPressed: () => _load(),
-                              ),
-                      );
-                    }
-                    final item = _items[index];
-                    return Focus(
-                      onKeyEvent: (_, event) {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey ==
-                                LogicalKeyboardKey.contextMenu &&
-                            widget.onRemove != null) {
-                          _remove(item);
-                          return KeyEventResult.handled;
-                        }
-                        return KeyEventResult.ignored;
-                      },
+              child: Row(
+                children: [
+                  if (widget.onBack != null) ...[
+                    Focus(
+                      focusNode: _backFocus,
                       canRequestFocus: false,
-                      child: GestureDetector(
-                        onLongPress: widget.onRemove == null
-                            ? null
-                            : () => _remove(item),
-                        child: _LibraryCard(
-                          item: item,
-                          onTap: () => widget.onOpen(item),
-                        ),
+                      child: PinkButton(
+                        ui: ui,
+                        height: 42,
+                        fontSize: 20,
+                        horizontalPadding: 18,
+                        label: '返回',
+                        icon: Icons.arrow_back_rounded,
+                        onPressed: widget.onBack!,
                       ),
-                    );
-                  },
-                ),
-        ),
-      ],
+                    ),
+                    SizedBox(width: 18 * ui),
+                  ],
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 26 * ui,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (widget.onRemove != null) ...[
+                    Text(
+                      '菜单键 / 长按移除',
+                      style: TextStyle(
+                        fontSize: 18 * ui,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    SizedBox(width: 16 * ui),
+                  ],
+                  PinkButton(
+                    ui: ui,
+                    height: 42,
+                    fontSize: 20,
+                    horizontalPadding: 18,
+                    label: '刷新',
+                    icon: Icons.refresh_rounded,
+                    onPressed: () => _load(reset: true),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: _items.isEmpty
+                ? Center(
+                    child: _loading
+                        ? const CircularProgressIndicator()
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _error ?? '暂无内容',
+                                style: TextStyle(
+                                  fontSize: 23 * ui,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              if (_error != null || _more) ...[
+                                SizedBox(height: 18 * ui),
+                                PinkButton(
+                                  ui: ui,
+                                  label: _error != null ? '重试' : '加载下一页',
+                                  onPressed: () => _load(reset: _error != null),
+                                ),
+                              ],
+                            ],
+                          ),
+                  )
+                : GridView.builder(
+                    controller: _scroll,
+                    padding: EdgeInsets.all(14 * ui),
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 480 * ui,
+                      childAspectRatio: 1.3,
+                      mainAxisSpacing: 24 * ui,
+                      crossAxisSpacing: 24 * ui,
+                    ),
+                    itemCount:
+                        _items.length +
+                        (_more || _loading || _error != null ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _items.length) {
+                        return Center(
+                          child: _loading
+                              ? const CircularProgressIndicator()
+                              : PinkButton(
+                                  ui: ui,
+                                  label: _error != null ? '重试' : '加载更多',
+                                  onPressed: () => _load(),
+                                ),
+                        );
+                      }
+                      final item = _items[index];
+                      return Focus(
+                        key: ValueKey(item.id),
+                        focusNode: _entryFocus.putIfAbsent(
+                          item.id,
+                          () => FocusNode(canRequestFocus: false),
+                        ),
+                        onKeyEvent: (_, event) {
+                          if (event is KeyDownEvent &&
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.contextMenu &&
+                              widget.onRemove != null) {
+                            _remove(item);
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        canRequestFocus: false,
+                        child: GestureDetector(
+                          onLongPress: widget.onRemove == null
+                              ? null
+                              : () => _remove(item),
+                          child: _LibraryCard(
+                            item: item,
+                            onTap: () => _openEntry(item),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -473,29 +617,6 @@ class _LibraryCard extends StatelessWidget {
                             ),
                           )
                         : BilibiliNetworkImage(item.cover),
-                    if (item.badge.isNotEmpty)
-                      Positioned(
-                        top: 10 * ui,
-                        right: 10 * ui,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10 * ui,
-                            vertical: 4 * ui,
-                          ),
-                          decoration: BoxDecoration(
-                            color: navigationAccentColor,
-                            borderRadius: BorderRadius.circular(8 * ui),
-                          ),
-                          child: Text(
-                            item.badge,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18 * ui,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
                     if (item.subtitle.isNotEmpty)
                       Positioned(
                         left: 10 * ui,
