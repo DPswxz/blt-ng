@@ -137,7 +137,7 @@ Future<(HistoryCursor, List<MediaCardInfo>)> listHistory({
   HistoryCursor? cursor,
   int count = 20,
 }) async {
-  Map<String, dynamic> queries = {'type': 'archive', 'ps': count};
+  Map<String, dynamic> queries = {'type': 'all', 'ps': count};
   if (cursor != null) {
     queries['max'] = cursor.max;
     queries['view_at'] =
@@ -163,7 +163,10 @@ Future<(HistoryCursor, List<MediaCardInfo>)> listHistory({
 }
 
 // 删除记录
-Future<void> deleteHistory(int avid) async {
+Future<void> deleteHistory(int avid, {String business = 'archive'}) async {
+  if (business != 'archive' && business != 'pgc') {
+    throw ArgumentError.value(business);
+  }
   final csrf = (await loadCookie())
       .firstWhere((c) => c.name == 'bili_jct')
       .value;
@@ -171,6 +174,6 @@ Future<void> deleteHistory(int avid) async {
     'POST',
     'https://api.bilibili.com/x/v2/history/delete',
     contentType: Headers.formUrlEncodedContentType,
-    body: {'kid': 'archive_$avid', 'csrf': csrf},
+    body: {'kid': '${business}_$avid', 'csrf': csrf},
   );
 }

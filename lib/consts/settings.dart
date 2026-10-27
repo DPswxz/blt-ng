@@ -41,15 +41,19 @@ enum PlayerAspectMode {
   String toString() => description;
 }
 
-// 循环播放
+// Playback-end behavior. Preserve stored none/single values from older builds.
 enum PlayerLoopMode {
-  none('none', '不循环'),
-  single('single', '单个循环');
+  none('none', '需要确认'),
+  next('next', '自动下一集'),
+  single('single', '自动循环');
 
   final String value;
   final String description;
 
   const PlayerLoopMode(this.value, this.description);
+
+  PlayerLoopMode effective({required bool hasNext}) =>
+      this == next && !hasNext ? none : this;
 
   static PlayerLoopMode? parse(String? v) {
     return PlayerLoopMode.values.firstWhereOrNull((e) => e.value == v);

@@ -342,6 +342,43 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('退出 BLT？'), findsNothing);
     expect(find.text('推荐视频A'), findsOneWidget);
+    expect(find.textContaining('再按一次返回退出应用'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('首页三秒内双返回退出，超时及切换栏目重置', (tester) async {
+    mockRecommend();
+    var exits = 0;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'SystemNavigator.pop') exits++;
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    await pumpPage(tester, const app.Page());
+    await flush(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(exits, 0);
+    await tester.tap(find.text('设置'));
+    await flush(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(exits, 0);
+    await tester.tap(find.text('首页'));
+    await flush(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(exits, 0);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(exits, 1);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('搜索页返回保留搜索栏目，不退出应用', (tester) async {

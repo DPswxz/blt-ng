@@ -81,8 +81,8 @@ List<PlayerBarAction> _actions(List<String> taps) => [
   PlayerBarAction(
     kind: PlayerControlKind.loop,
     icon: Icons.loop_rounded,
-    label: '循环播放',
-    value: '不循环',
+    label: '播放完后',
+    value: '需要确认',
     onSelect: () => taps.add('loop'),
   ),
   PlayerBarAction(
@@ -139,8 +139,8 @@ List<PlayerPanelRow> _panelRows(List<String> taps) => [
   PlayerPanelRow.item(
     kind: PlayerControlKind.loop,
     icon: Icons.loop_rounded,
-    label: '循环播放',
-    value: '不循环',
+    label: '播放完后',
+    value: '需要确认',
     onSelect: () => taps.add('panel-loop'),
   ),
   const PlayerPanelRow.divider(),
@@ -344,7 +344,7 @@ void main() {
       (PlayerControlKind.audio, '音轨'),
       (PlayerControlKind.danmaku, '弹幕'),
       (PlayerControlKind.aspect, '画面比例'),
-      (PlayerControlKind.loop, '循环播放'),
+      (PlayerControlKind.loop, '播放完后'),
       (PlayerControlKind.moreSettings, '更多设置'),
     ];
     const valued = <(PlayerControlKind, String)>[
@@ -353,7 +353,7 @@ void main() {
       (PlayerControlKind.audio, '默认'),
       (PlayerControlKind.danmaku, '开'),
       (PlayerControlKind.aspect, '适应'),
-      (PlayerControlKind.loop, '不循环'),
+      (PlayerControlKind.loop, '需要确认'),
     ];
 
     final iconCenters = [for (final (kind, _) in labeled) iconCenterOf(kind)];

@@ -24,6 +24,8 @@ const _overlayMaxScale = 1.0;
 
 class VideoCard extends StatelessWidget {
   final MediaCardInfo video;
+  final bool showUploader;
+  final bool selected;
   final void Function()? onTap;
   final void Function()? onFocus;
   final double aspectRatio; // 卡片宽高比
@@ -32,6 +34,8 @@ class VideoCard extends StatelessWidget {
   const VideoCard({
     super.key,
     required this.video,
+    this.showUploader = true,
+    this.selected = false,
     this.onTap,
     this.onFocus,
     this.aspectRatio = videoCardAspectRatio,
@@ -60,7 +64,7 @@ class VideoCard extends StatelessWidget {
       child: AspectRatio(
         aspectRatio: aspectRatio,
         child: Material(
-          color: Colors.white,
+          color: selected ? focusableSurfaceColor : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius - 2 * ui),
           ),
@@ -88,7 +92,7 @@ class VideoCard extends StatelessWidget {
   }
 
   Widget? _buildProgress(double ui) {
-    if (video.progress == null) return null;
+    if (video.progress == null || video.duration.inSeconds <= 0) return null;
     final progressRatio =
         video.progress!.duration().inSeconds / video.duration.inSeconds;
     if (progressRatio < 0.01) return null;
@@ -131,34 +135,35 @@ class VideoCard extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          top: edgeY,
-          left: edgeX,
-          child: CoverBadge(
-            ui: ui,
-            scale: scale,
-            padding: EdgeInsets.symmetric(
-              horizontal: 8 * ui * scale,
-              vertical: 3 * ui * scale,
-            ),
-            child: Row(
-              children: [
-                BilibiliAvatar(video.userAvatar, radius: 22 * ui * scale),
-                SizedBox(width: 8 * ui * scale),
-                Text(
-                  video.userName,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24 * ui * scale,
-                    fontWeight: FontWeight.w600,
+        if (showUploader)
+          Positioned(
+            top: edgeY,
+            left: edgeX,
+            child: CoverBadge(
+              ui: ui,
+              scale: scale,
+              padding: EdgeInsets.symmetric(
+                horizontal: 8 * ui * scale,
+                vertical: 3 * ui * scale,
+              ),
+              child: Row(
+                children: [
+                  BilibiliAvatar(video.userAvatar, radius: 22 * ui * scale),
+                  SizedBox(width: 8 * ui * scale),
+                  Text(
+                    video.userName,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24 * ui * scale,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
         ?video.progress != null && video.progress!.finished()
             ? Positioned(
                 top: edgeY,
@@ -266,8 +271,8 @@ class VideoCard extends StatelessWidget {
               lineHeight: 1.4,
               // 字号与卡片宽度挂钩，避免卡片过窄时标题被撑得过大
               maxFontSize: constraints.maxWidth * 0.065,
-              style: const TextStyle(
-                color: Colors.black87,
+              style: TextStyle(
+                color: selected ? navigationAccentColor : Colors.black87,
                 fontWeight: FontWeight.w600,
               ),
               overflow: TextOverflow.ellipsis,

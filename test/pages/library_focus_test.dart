@@ -11,6 +11,34 @@ bool focused(WidgetTester tester, String label) =>
 
 void main() {
   setupPageTestEnv();
+  testWidgets('收藏夹保留标题，隐藏返回刷新和提示，遥控返回直接退出', (t) async {
+    var backs = 0;
+    await pumpPage(
+      t,
+      LibraryCollectionPane(
+        title: '测试收藏夹',
+        folderView: true,
+        loader: (_) async =>
+            const LibraryBatch([LibraryEntry(id: 1, title: '收藏视频')]),
+        onOpen: (_) {},
+        onRemove: (_) async {},
+        onBack: () => backs++,
+      ),
+    );
+    await flush(t);
+    expect(find.text('测试收藏夹'), findsOneWidget);
+    expect(find.text('返回'), findsNothing);
+    expect(find.text('刷新'), findsNothing);
+    expect(find.text('菜单键 / 长按移除'), findsNothing);
+    await t.sendKeyEvent(LogicalKeyboardKey.contextMenu);
+    await flush(t);
+    expect(find.text('移出此收藏夹？'), findsOneWidget);
+    await t.tap(find.text('取消'));
+    await t.pumpAndSettle();
+    await t.binding.handlePopRoute();
+    await t.pump();
+    expect(backs, 1);
+  });
   test('番剧播放列表保留每集独立aid、cid、epid，过滤不可播放项', () {
     final entries = libraryPlaybackEpisodes(const [
       LibraryEntry(id: 11, title: '第一集', aid: 101, cid: 201),

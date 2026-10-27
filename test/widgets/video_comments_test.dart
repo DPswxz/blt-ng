@@ -2,11 +2,43 @@ import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/widgets/video_comments.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers/page_test_env.dart';
 
 void main() {
   setupPageTestEnv();
+  testWidgets('紧凑评论固定显示两行，第二行完整位于正文区域内', (tester) async {
+    for (final size in [
+      const Size(1280, 720),
+      const Size(1920, 1080),
+      const Size(3840, 2160),
+    ]) {
+      await pumpPage(
+        tester,
+        SizedBox(
+          height: 200 * size.height / 1080,
+          child: VideoCommentsPanel(
+            key: ValueKey(size),
+            avid: 1,
+            loader: (_, _, _) async => CommentPage([
+              VideoComment(id: 8, author: '评论人', message: '这是第一行内容\n这是第二行内容'),
+            ], 1),
+          ),
+        ),
+        size: size,
+      );
+      await flush(tester);
+      final finder = find.byKey(const ValueKey('comment-preview-8'));
+      final render = tester.renderObject<RenderParagraph>(finder);
+      final boxes = render.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 17),
+      );
+      expect(boxes.length, 2);
+      expect(boxes.last.bottom, lessThanOrEqualTo(render.size.height + .1));
+      expect(tester.takeException(), isNull);
+    }
+  });
   Future<CommentPage> loader(int page, int sort, int? root) async =>
       CommentPage([
         VideoComment(
@@ -39,6 +71,14 @@ void main() {
       expect(find.text('这是第一条评论'), findsOneWidget);
       expect(find.text('踩'), findsNothing);
       expect(find.byIcon(Icons.thumb_down_alt_outlined), findsNothing);
+      await tester.drag(
+        find.byType(ListView).first,
+        Offset(-1000 * (size.width / 1920), 0),
+      );
+      await flush(tester);
+      expect(find.byKey(const ValueKey('comments-end-marker')), findsNothing);
+      expect(find.text('已显示全部'), findsNothing);
+      expect(find.text('已显示当前可见评论'), findsNothing);
       expect(tester.takeException(), isNull);
     }
   });
@@ -79,44 +119,86 @@ void main() {
   });
   testWidgets('长评论全文不截断，二级回复缩进且字号小于主评论', (tester) async {
     final long = List.filled(20, '这是一条多行长评论，完整正文应该可查看。').join('\n');
-    await pumpPage(tester, SizedBox(height: 230, child: VideoCommentsPanel(
-      avid: 1, loader: (p,s,root) async => CommentPage([
-        VideoComment(id: root == null ? 1 : 2, author: root == null ? '主评论' : '二级回复',
-          message: root == null ? long : '这是一条回复', replyCount: 1, likes: 0),
-      ], 1),
-    )));
+    await pumpPage(
+      tester,
+      SizedBox(
+        height: 230,
+        child: VideoCommentsPanel(
+          avid: 1,
+          loader: (p, s, root) async => CommentPage([
+            VideoComment(
+              id: root == null ? 1 : 2,
+              author: root == null ? '主评论' : '二级回复',
+              message: root == null ? long : '这是一条回复',
+              replyCount: 1,
+              likes: 0,
+            ),
+          ], 1),
+        ),
+      ),
+    );
     await flush(tester);
     await tester.tap(find.text('全文 · 1 回复'));
     await tester.pumpAndSettle();
     final full = tester.widgetList<Text>(find.text(long)).last;
     expect(full.maxLines, isNull);
     expect(full.overflow, isNull);
-    await tester.scrollUntilVisible(find.text('这是一条回复'), 400,
-      scrollable: find.byType(Scrollable).last);
+    await tester.scrollUntilVisible(
+      find.text('这是一条回复'),
+      400,
+      scrollable: find.byType(Scrollable).last,
+    );
     final reply = tester.widget<Text>(find.text('这是一条回复'));
     expect(reply.style!.fontSize, lessThan(full.style!.fontSize!));
-    expect(tester.getTopLeft(find.text('这是一条回复')).dx,
-      greaterThan(tester.getTopLeft(find.text(long).last).dx));
+    expect(
+      tester.getTopLeft(find.text('这是一条回复')).dx,
+      greaterThan(tester.getTopLeft(find.text(long).last).dx),
+    );
     expect(tester.takeException(), isNull);
   });
 
   testWidgets('预览固定一行用户名两行正文，左侧按钮文字居中', (tester) async {
-    const text='这是一条需要换行的评论正文，用足够多文字验证两行内容不会被底部按钮截断。第二行内容也应完整显示。';
-    for(final size in [const Size(1280,720),const Size(1920,1080),const Size(3840,2160)]) {
-      final ui=size.height/1080;
-      await pumpPage(tester,SizedBox(height:200*ui,child:VideoCommentsPanel(key:ValueKey(size),avid:1,
-        loader:(p,s,r)async=>CommentPage([VideoComment(id:1,author:'评论用户名',message:text,replyCount:1,likes:3)],1))),size:size);
+    const text = '这是一条需要换行的评论正文，用足够多文字验证两行内容不会被底部按钮截断。第二行内容也应完整显示。';
+    for (final size in [
+      const Size(1280, 720),
+      const Size(1920, 1080),
+      const Size(3840, 2160),
+    ]) {
+      final ui = size.height / 1080;
+      await pumpPage(
+        tester,
+        SizedBox(
+          height: 200 * ui,
+          child: VideoCommentsPanel(
+            key: ValueKey(size),
+            avid: 1,
+            loader: (p, s, r) async => CommentPage([
+              VideoComment(
+                id: 1,
+                author: '评论用户名',
+                message: text,
+                replyCount: 1,
+                likes: 3,
+              ),
+            ], 1),
+          ),
+        ),
+        size: size,
+      );
       await flush(tester);
-      final content=tester.widget<Text>(find.text(text));
-      expect(content.maxLines,2);
-      expect(tester.getSize(find.text(text)).height,greaterThanOrEqualTo(50*ui-0.1));
-      expect(tester.widget<Text>(find.text('评论用户名')).maxLines,1);
-      final button=find.widgetWithText(PinkButton,'热门');
-      final box=tester.getRect(button), label=tester.getRect(find.text('热门'));
-      expect(label.center.dx,closeTo(box.center.dx,0.5));
-      expect(label.center.dy,closeTo(box.center.dy,0.5));
-      expect(tester.takeException(),isNull);
+      final content = tester.widget<Text>(find.text(text));
+      expect(content.maxLines, 2);
+      expect(
+        tester.getSize(find.text(text)).height,
+        greaterThanOrEqualTo(50 * ui - 0.1),
+      );
+      expect(tester.widget<Text>(find.text('评论用户名')).maxLines, 1);
+      final button = find.widgetWithText(PinkButton, '热门');
+      final box = tester.getRect(button),
+          label = tester.getRect(find.text('热门'));
+      expect(label.center.dx, closeTo(box.center.dx, 0.5));
+      expect(label.center.dy, closeTo(box.center.dy, 0.5));
+      expect(tester.takeException(), isNull);
     }
   });
-
 }

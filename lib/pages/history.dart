@@ -4,6 +4,8 @@ import 'package:blt/apis/bilibili/history.dart';
 import 'package:blt/consts/assets.dart';
 import 'package:blt/models/video.dart' show MediaCardInfo;
 import 'package:blt/pages/video_detail.dart';
+import 'package:blt/pages/season_detail.dart';
+import 'package:blt/apis/bilibili/library.dart' show getSeasonDetailByEpisode;
 import 'package:blt/storages/auth.dart';
 import 'package:blt/widgets/loading.dart';
 import 'package:blt/widgets/tooltip.dart';
@@ -66,7 +68,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(() => VideoDetailPageWrap(avid: video.avid, cid: video.cid));
+    Get.to(() => historyDetailPage(video));
   }
 
   @override
@@ -82,7 +84,16 @@ class _HistoryPageState extends State<HistoryPage> {
             if (!loginInfoNotifier.value.isLogin) return;
 
             try {
-              await deleteHistory(media.avid);
+              final id =
+                  media.historyBusiness == 'pgc' &&
+                      media.historyKeyId == null &&
+                      media.episodeId != null
+                  ? (await getSeasonDetailByEpisode(media.episodeId!)).id
+                  : media.historyKeyId ?? media.avid;
+              await deleteHistory(
+                id,
+                business: media.historyBusiness == 'pgc' ? 'pgc' : 'archive',
+              );
             } catch (e) {
               if (!context.mounted) return;
               showAppError(context, e);
@@ -104,3 +115,13 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 }
+
+Widget historyDetailPage(MediaCardInfo video) =>
+    (video.episodeId ?? 0) > 0 || (video.seasonId ?? 0) > 0
+    ? SeasonDetailPage(
+        seasonId: video.seasonId ?? 0,
+        episodeId: video.episodeId,
+        initialAid: video.avid,
+        initialCid: video.cid,
+      )
+    : VideoDetailPageWrap(avid: video.avid, cid: video.cid);

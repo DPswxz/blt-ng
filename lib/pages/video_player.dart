@@ -1,3 +1,4 @@
+import 'package:blt/storages/season_history.dart';
 import 'package:blt/utils/playback_completion.dart';
 import 'package:blt/widgets/playback_completed.dart';
 import 'package:blt/utils/request_scope.dart';
@@ -42,6 +43,7 @@ class VideoPlayerPage extends StatefulWidget {
 
   final String decoderMode;
   final Duration? initialPosition;
+  final int? seasonId;
   final bool recoveredNative;
   final bool danmu;
   final bool ha;
@@ -54,6 +56,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.cid,
     this.decoderMode = 'auto',
     this.initialPosition,
+    this.seasonId,
     this.recoveredNative = false,
     required this.danmu,
     required this.ha,
@@ -110,6 +113,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late final PlaybackCompletionController _completion;
   bool _suppressCompletionKeyUp = false;
   bool _initialPositionConsumed = false;
+  int? _startFromBeginningCid;
   StreamSubscription<String>? _errorSub;
   final _videoReady = ValueNotifier(false);
 
@@ -141,7 +145,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       shouldShow: () =>
           mounted &&
           _videoReady.value &&
-          _loopMode.value == PlayerLoopMode.none,
+          _loopMode.value.effective(hasNext: _hasNextEpisode) ==
+              PlayerLoopMode.none,
       onCompleted: _onPlayCompleted,
       seek: (position) async {
         _danmakuCtl.wait(_danmakuWaitDuration);
@@ -225,7 +230,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
     // 控制层隐藏时设置面板一并收起
     _panelVisible.value = false;
-    _screenFocusNode.requestFocus();
+    if (!_completion.value) _screenFocusNode.requestFocus();
   }
 
   void _onPlayError(String err) {
@@ -428,6 +433,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Future<void> _loadEpisode() async {
     // 快照本次请求的分P，若处理过程中用户又切了分P则丢弃本次结果
     final cid = _currentCid.value;
+    if (_startFromBeginningCid != cid) _startFromBeginningCid = null;
     final currentAvid = _avidForCid(cid);
     _recoveryBudget = 8;
     // 新分P就绪前禁止画质等操作，避免用到旧分P的播放信息
@@ -518,7 +524,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       await _playDashMedia(
         info.dashData,
         quality,
-        start: !_initialPositionConsumed
+        start: cid == _startFromBeginningCid
+            ? Duration.zero
+            : !_initialPositionConsumed
             ? widget.initialPosition ?? playInfo?.lastPlayTime
             : playInfo?.lastPlayTime,
       );
@@ -535,8 +543,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       _videoPlayURLInfo = info;
       _currentQuality.value = quality;
       _videoReady.value = true;
+      if (widget.seasonId != null) {
+        final ep = widget.video.episodes.where((e) => e.cid == cid).firstOrNull;
+        if (ep?.episodeId != null) {
+          SeasonHistory.save(
+            widget.seasonId!,
+            ep!.episodeId!,
+            loginInfoNotifier.value.mid ?? 0,
+          ).ignore();
+        }
+      }
       success = true;
       _initialPositionConsumed = true;
+      if (_startFromBeginningCid == cid) _startFromBeginningCid = null;
       // 开始周期心跳（每15秒上报一次，切P/退出时取消）
       _heartbeatTimer = Timer.periodic(
         const Duration(seconds: 15),
@@ -782,12 +801,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _displayControl.value = false;
     _panelVisible.value = false;
     _danmakuCtl.clear();
+    if (_loopMode.value == PlayerLoopMode.next && _hasNextEpisode) {
+      _onNextEpisode(fromBeginning: true);
+    }
   }
 
   Future<void> _restartCompletedVideo() async {
     _suppressCompletionKeyUp = HardwareKeyboard.instance.logicalKeysPressed.any(
       (key) =>
-          key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select,
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.space,
     );
     try {
       await _completion.restart();
@@ -797,10 +821,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
+  void _nextCompletedVideo() {
+    _suppressCompletionKeyUp = HardwareKeyboard.instance.logicalKeysPressed.any(
+      (key) =>
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.space,
+    );
+    _onNextEpisode();
+    _screenFocusNode.requestFocus();
+  }
+
   // 当前分P下标，-1 表示不在列表中
   int get _currentEpisodeIndex {
     return widget.video.episodes.indexWhere((e) => e.cid == _currentCid.value);
   }
+
+  bool get _hasNextEpisode =>
+      _currentEpisodeIndex >= 0 &&
+      _currentEpisodeIndex < widget.video.episodes.length - 1;
 
   void _onPrevEpisode() {
     final index = _currentEpisodeIndex;
@@ -808,10 +847,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _currentCid.value = widget.video.episodes[index - 1].cid;
   }
 
-  void _onNextEpisode() {
+  void _onNextEpisode({bool fromBeginning = false}) {
     final index = _currentEpisodeIndex;
     final episodes = widget.video.episodes;
     if (index < 0 || index >= episodes.length - 1) return;
+    if (fromBeginning) _startFromBeginningCid = episodes[index + 1].cid;
     _currentCid.value = episodes[index + 1].cid;
   }
 
@@ -879,6 +919,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         hwdec: widget.hwdec,
         decoderMode: mode,
         initialPosition: _controller.player.state.position,
+        seasonId: widget.seasonId,
         recoveredNative: recovered,
       ),
       preventDuplicates: false,
@@ -1007,7 +1048,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Future<void> _onLoopTapped() async {
     final selected = await showPlayerPicker<PlayerLoopMode>(
       context: context,
-      title: '循环播放',
+      title: '播放完后',
       options: PlayerLoopMode.values,
       current: _loopMode.value,
       labelOf: (mode) => mode.description,
@@ -1068,12 +1109,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                                 ?.title ??
                             widget.video.title,
                         onRestart: _restartCompletedVideo,
-                        onBack: () => Get.back(),
                         onNext:
                             _currentEpisodeIndex >= 0 &&
                                 _currentEpisodeIndex <
                                     widget.video.episodes.length - 1
-                            ? _onNextEpisode
+                            ? _nextCompletedVideo
                             : null,
                       )
                     : const SizedBox.shrink(),
@@ -1210,7 +1250,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       PlayerBarAction(
         kind: PlayerControlKind.loop,
         icon: Icons.loop_rounded,
-        label: '循环播放',
+        label: '播放完后',
         value: _loopMode.value.description,
         onSelect: _onLoopTapped,
       ),
@@ -1244,7 +1284,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       PlayerPanelRow.item(
         kind: PlayerControlKind.loop,
         icon: Icons.loop_rounded,
-        label: '循环播放',
+        label: '播放完后',
         value: _loopMode.value.description,
         onSelect: _onLoopTapped,
       ),
@@ -1277,7 +1317,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (_suppressCompletionKeyUp &&
         value is KeyUpEvent &&
         (value.logicalKey == LogicalKeyboardKey.enter ||
-            value.logicalKey == LogicalKeyboardKey.select)) {
+            value.logicalKey == LogicalKeyboardKey.select ||
+            value.logicalKey == LogicalKeyboardKey.space)) {
       _suppressCompletionKeyUp = false;
       return;
     }

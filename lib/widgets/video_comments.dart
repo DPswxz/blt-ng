@@ -1,3 +1,4 @@
+import 'package:blt/widgets/horizontal_rail_boundary.dart';
 import 'package:blt/utils/request_scope.dart';
 import 'package:blt/apis/bilibili/comments.dart';
 import 'package:blt/consts/color.dart';
@@ -127,15 +128,17 @@ class _VideoCommentsPanelState extends State<VideoCommentsPanel> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Icon(Icons.forum_rounded, color: biliPink, size: 30 * ui),
+                  SizedBox(height: 4 * ui),
                   Text(
                     '评论 · $_total',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 19 * ui,
+                      fontSize: 22 * ui,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  SizedBox(height: 6 * ui),
+                  SizedBox(height: 4 * ui),
                   PinkButton(
                     ui: ui,
                     height: 38,
@@ -147,7 +150,7 @@ class _VideoCommentsPanelState extends State<VideoCommentsPanel> {
                       _load(reset: true);
                     },
                   ),
-                  SizedBox(height: 6 * ui),
+                  SizedBox(height: 4 * ui),
                   PinkButton(
                     ui: ui,
                     height: 38,
@@ -222,67 +225,71 @@ class _VideoCommentsPanelState extends State<VideoCommentsPanel> {
                             ),
                           ),
                   )
-                : ListView.separated(
-                    scrollDirection: widget.compact
-                        ? Axis.horizontal
-                        : Axis.vertical,
-                    padding: EdgeInsets.all(14 * ui),
-                    itemCount: data.length + 1,
-                    separatorBuilder: (_, _) =>
-                        SizedBox(width: 16 * ui, height: 14 * ui),
-                    itemBuilder: (context, index) {
-                      if (index == data.length) {
-                        return Center(
-                          child: _loading
-                              ? const CircularProgressIndicator()
-                              : _more || _error != null
-                              ? PinkButton(
-                                  ui: ui,
-                                  height: 40,
-                                  label: _error != null ? '重试' : '加载更多',
-                                  onPressed: () => _load(),
-                                )
-                              : Text(
-                                  _items.length >= _total
-                                      ? '已显示全部'
-                                      : '已显示当前可见评论',
-                                  style: TextStyle(
-                                    fontSize: 18 * ui,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                        );
-                      }
-                      final comment = data[index];
-                      final card = _CommentCard(
-                        avid: widget.avid,
-                        comment: comment,
-                        compact: widget.compact,
-                        reply: widget.root != null && index > 0,
-                        onOpen: widget.compact || widget.root == null
-                            ? () => _open(root: comment)
-                            : null,
-                      );
-                      return widget.compact
-                          ? SizedBox(width: 540 * ui, child: card)
-                          : Padding(
-                              padding: EdgeInsets.only(
-                                left: widget.root != null && index > 0
-                                    ? 64 * ui
-                                    : 0,
-                                right: widget.root != null && index > 0
-                                    ? 24 * ui
-                                    : 0,
+                : _rail(
+                    ListView.separated(
+                      scrollDirection: widget.compact
+                          ? Axis.horizontal
+                          : Axis.vertical,
+                      padding: EdgeInsets.all(14 * ui),
+                      itemCount:
+                          data.length +
+                          (_more || _loading || _error != null ? 1 : 0),
+                      separatorBuilder: (_, _) =>
+                          SizedBox(width: 16 * ui, height: 14 * ui),
+                      itemBuilder: (context, index) {
+                        if (index == data.length) {
+                          return SizedBox(
+                            key: const ValueKey("comments-end-marker"),
+                            width: widget.compact ? 240 * ui : null,
+                            child: Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12 * ui),
+                                child: _loading
+                                    ? const CircularProgressIndicator()
+                                    : PinkButton(
+                                        ui: ui,
+                                        height: 40,
+                                        label: _error != null ? '重试' : '加载更多',
+                                        onPressed: () => _load(),
+                                      ),
                               ),
-                              child: card,
-                            );
-                    },
+                            ),
+                          );
+                        }
+                        final comment = data[index];
+                        final card = _CommentCard(
+                          avid: widget.avid,
+                          comment: comment,
+                          compact: widget.compact,
+                          reply: widget.root != null && index > 0,
+                          onOpen: widget.compact || widget.root == null
+                              ? () => _open(root: comment)
+                              : null,
+                        );
+                        return widget.compact
+                            ? SizedBox(width: 540 * ui, child: card)
+                            : Padding(
+                                padding: EdgeInsets.only(
+                                  left: widget.root != null && index > 0
+                                      ? 64 * ui
+                                      : 0,
+                                  right: widget.root != null && index > 0
+                                      ? 24 * ui
+                                      : 0,
+                                ),
+                                child: card,
+                              );
+                      },
+                    ),
                   ),
           ),
         ],
       ),
     );
   }
+
+  Widget _rail(Widget child) =>
+      widget.compact ? HorizontalRailBoundary(child: child) : child;
 }
 
 class _CommentCard extends StatefulWidget {
@@ -336,13 +343,15 @@ class _CommentCardState extends State<_CommentCard> {
         ),
         SizedBox(height: 4 * ui),
         if (widget.compact)
-          Expanded(
+          SizedBox(
+            height: 56 * ui,
             child: GestureDetector(
               onTap: widget.onOpen,
               child: DpadFocusable(
                 onSelect: widget.onOpen,
                 builder: pinkFocusEffect(ui: ui, radius: 8 * ui),
                 child: Text(
+                  key: ValueKey('comment-preview-${c.id}'),
                   c.message,
                   maxLines: 2,
                   overflow: TextOverflow.clip,

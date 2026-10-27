@@ -44,6 +44,8 @@ class PlayProgress {
 
 // 媒体卡片信息
 class MediaCardInfo {
+  final int? episodeId, seasonId, historyKeyId;
+  final String historyBusiness;
   final MediaType type;
   final int avid;
   final String bvid;
@@ -63,6 +65,10 @@ class MediaCardInfo {
     required this.avid,
     required this.bvid,
     this.cid,
+    this.episodeId,
+    this.seasonId,
+    this.historyKeyId,
+    this.historyBusiness = '',
     required this.title,
     required this.cover,
     required this.duration,
@@ -76,6 +82,10 @@ class MediaCardInfo {
 
   // 核心字段（avid/标题）缺失或非法时返回 null，调用方丢弃该项
   static MediaCardInfo? _build({
+    int? episodeId,
+    int? seasonId,
+    int? historyKeyId,
+    String historyBusiness = '',
     required MediaType type,
     required int avid,
     required String bvid,
@@ -92,6 +102,10 @@ class MediaCardInfo {
   }) {
     if (avid <= 0 || title.isEmpty) return null;
     return MediaCardInfo(
+      episodeId: episodeId,
+      seasonId: seasonId,
+      historyKeyId: historyKeyId,
+      historyBusiness: historyBusiness,
       type: type,
       avid: avid,
       bvid: bvid,
@@ -148,8 +162,33 @@ class MediaCardInfo {
 
   static MediaCardInfo? fromHistoryJson(Map<String, dynamic> json) {
     final history = jsonMap(json['history']) ?? const <String, dynamic>{};
+    final business = jsonString(history['business']);
+    if (business.isNotEmpty && business != 'archive' && business != 'pgc') {
+      return null;
+    }
+    final epid = jsonInt(history['epid']);
+    final rawKid = jsonInt(json['kid']);
+    final kid = rawKid > 0
+        ? rawKid
+        : business == 'pgc'
+        ? int.tryParse(
+                RegExp(
+                      r'/bangumi/play/ss(\d+)',
+                    ).firstMatch(jsonString(json['uri']))?.group(1) ??
+                    '',
+              ) ??
+              0
+        : jsonInt(history['oid']);
     return _build(
-      type: _mediaType(jsonString(json['goto'])),
+      type: business == 'pgc' || epid > 0
+          ? MediaType.ogv
+          : business == 'archive'
+          ? MediaType.video
+          : _mediaType(jsonString(json['goto'])),
+      episodeId: epid > 0 ? epid : null,
+      seasonId: business == 'pgc' && kid > 0 ? kid : null,
+      historyKeyId: kid > 0 ? kid : null,
+      historyBusiness: business,
       avid: jsonInt(history['oid']),
       bvid: jsonString(history['bvid']),
       cid: history['cid'] == null ? null : jsonInt(history['cid']),
@@ -273,6 +312,7 @@ class Episode {
 
 // 视频信息
 class Video {
+  final int? bangumiEpisodeId;
   final int avid;
   final String bvid;
   final String title;
@@ -301,6 +341,7 @@ class Video {
     required this.publishTime,
     required this.cid,
     required this.episodes,
+    this.bangumiEpisodeId,
   });
 
   // New rich descriptions may be present even when the legacy desc is empty.
@@ -335,6 +376,7 @@ class Video {
     var cid = jsonInt(json['cid']);
     if (cid <= 0 && episodes.isNotEmpty) cid = episodes.first.cid;
     return Video(
+      bangumiEpisodeId: episodeIdFromRedirect(jsonString(json['redirect_url'])),
       avid: avid,
       bvid: jsonString(json['bvid']),
       title: title,
@@ -349,5 +391,16 @@ class Video {
       cid: cid,
       episodes: episodes,
     );
+  }
+
+  static int? episodeIdFromRedirect(String value) {
+    final uri = Uri.tryParse(value.startsWith('//') ? 'https:$value' : value);
+    if (uri == null ||
+        (uri.host != 'www.bilibili.com' && uri.host != 'bilibili.com')) {
+      return null;
+    }
+    final match = RegExp(r'^/bangumi/play/ep(\d+)(?:/|$)').firstMatch(uri.path);
+    final id = int.tryParse(match?.group(1) ?? '');
+    return id != null && id > 0 ? id : null;
   }
 }

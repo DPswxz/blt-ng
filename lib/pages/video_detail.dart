@@ -1,9 +1,12 @@
-import 'package:blt/apis/bilibili/library.dart';
+import 'package:blt/widgets/horizontal_rail_boundary.dart';
+import 'package:blt/pages/season_detail.dart';
+import 'package:blt/widgets/video_actions.dart';
+import 'package:blt/apis/bilibili/toview.dart' show addToView;
+import 'package:blt/widgets/detail_parts.dart';
 import 'package:blt/widgets/video_comments.dart';
 import 'package:blt/apis/bilibili/media.dart'
-    show getVideoInfo, getArchiveRelation, ArchiveRelation, likeMedia;
+    show getVideoInfo, getArchiveRelation, ArchiveRelation;
 import 'package:blt/apis/bilibili/recommend.dart' show fetchRelatedVideos;
-import 'package:blt/apis/bilibili/toview.dart';
 import 'package:blt/apis/bilibili/user.dart'
     show
         UserRelation,
@@ -62,7 +65,10 @@ class VideoDetailPageWrap extends StatelessWidget {
 
   Future<VideoDetailPageInput> _loadVideoInput() async {
     // 先并行发起视频信息、视频关系、相关推荐请求
-    final videoFuture = getVideoInfo(avid: avid, bvid: bvid);
+    final video = await getVideoInfo(avid: avid, bvid: bvid);
+    if (video.bangumiEpisodeId != null) {
+      return VideoDetailPageInput(video, ArchiveRelation(), const []);
+    }
     final relationFuture = getArchiveRelation(
       avid: avid,
       bvid: bvid,
@@ -74,7 +80,6 @@ class VideoDetailPageWrap extends StatelessWidget {
     ).onError((_, _) => <MediaCardInfo>[]);
 
     // 视频信息返回后立刻并行查询up主粉丝数与关注状态
-    final video = await videoFuture;
     final userFuture = (
       _fetchFollowerCount(video.userMid),
       _fetchUserRelation(video.userMid),
@@ -99,6 +104,13 @@ class VideoDetailPageWrap extends StatelessWidget {
       body: LoadingWidget(
         loader: _loadVideoInput,
         builder: (context, input) {
+          if (input.video.bangumiEpisodeId != null) {
+            return SeasonDetailPage(
+              episodeId: input.video.bangumiEpisodeId,
+              initialAid: input.video.avid,
+              initialCid: cid ?? input.video.cid,
+            );
+          }
           return VideoDetailPage(
             video: input.video,
             cid: cid,
@@ -155,11 +167,8 @@ class VideoDetailPage extends StatefulWidget {
 }
 
 class _VideoDetailPageState extends State<VideoDetailPage> {
-  bool? _inToView;
-  bool _actionBusy = false;
   late final ValueNotifier<int> _currentEpisodeCid; // 当前分P
   late final VideoGridViewProvider _relatedVideosProvider; // 相关视频提供方
-  late final ValueNotifier<bool> _like; // 点赞
   late final ValueNotifier<bool> _following; // 关注
   late final ValueNotifier<int?> _followerCount; // 粉丝数
 
@@ -170,15 +179,12 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     _relatedVideosProvider = VideoGridViewProvider(
       initVideos: widget.relatedVideos,
     );
-    _like = ValueNotifier(widget.relation.like);
-    _loadToViewStatus();
     _following = ValueNotifier(widget.userRelation.following);
     _followerCount = ValueNotifier(widget.followerCount);
   }
 
   @override
   void dispose() {
-    _like.dispose();
     _following.dispose();
     _followerCount.dispose();
     _relatedVideosProvider.dispose();
@@ -441,217 +447,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     );
   }
 
-  Widget _buildRelations(double ui) {
-    // 等宽胶囊按钮：横向 5 格，遥控器左右移动即可，宽度稳定不随数字长度跳动
-    Widget stretch(_RelationAction action) => Expanded(child: action);
-
-    return ValueListenableBuilder(
-      valueListenable: _like,
-      builder: (context, like, _) => Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          stretch(
-            _RelationAction(
-              ui: ui,
-              icon: Icons.thumb_up_rounded,
-              label: amountString(widget.video.stat.likeCount),
-              active: like,
-              onPressed: _onLikeTapped,
-            ),
-          ),
-          SizedBox(width: 12 * ui),
-          stretch(
-            _RelationAction(
-              ui: ui,
-              iconFont: IconFont.coin,
-              iconScale: 1.1,
-              label: amountString(widget.video.stat.coinCount),
-              active: widget.relation.coin > 0,
-              onPressed: _onCoinTapped,
-            ),
-          ),
-          SizedBox(width: 12 * ui),
-          stretch(
-            _RelationAction(
-              ui: ui,
-              icon: Icons.star_rounded,
-              iconScale: 1.2,
-              label: amountString(widget.video.stat.favoriteCount),
-              active: widget.relation.favorite,
-              onPressed: _onFavoriteTapped,
-            ),
-          ),
-          SizedBox(width: 12 * ui),
-          stretch(
-            _RelationAction(
-              ui: ui,
-              iconFont: IconFont.share,
-              iconScale: 1.1,
-              label: amountString(widget.video.stat.shareCount),
-              onPressed: () => pushTooltipInfo(context, '暂不支持该功能！'),
-            ),
-          ),
-          SizedBox(width: 12 * ui),
-          stretch(
-            _RelationAction(
-              ui: ui,
-              iconFont: IconFont.playlist,
-              iconScale: 1.1,
-              active: _inToView == true,
-              onPressed: _onAddToViewTapped,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _onLikeTapped() async {
-    try {
-      await likeMedia(widget.video.avid, like: !widget.relation.like);
-      if (!mounted) return;
-      pushTooltipInfo(context, '${widget.relation.like ? '取消' : ''}点赞成功！');
-      widget.relation.like = !widget.relation.like;
-      _like.value = widget.relation.like;
-    } catch (e) {
-      if (!mounted) return;
-      showAppError(context, e);
-    }
-  }
-
-  Future<void> _loadToViewStatus() async {
-    if (!loginInfoNotifier.value.isLogin) return;
-    try {
-      final selected = await isInToView(widget.video.avid);
-      if (mounted) setState(() => _inToView = selected);
-    } catch (_) {
-      /* A failed lookup must not be mistaken for an empty list. */
-    }
-  }
-
-  bool _requireLogin() {
-    if (loginInfoNotifier.value.isLogin) return true;
-    pushTooltipInfo(context, '请先登录！');
-    return false;
-  }
-
-  Future<void> _onAddToViewTapped() async {
-    if (_actionBusy || !_requireLogin()) return;
-    _actionBusy = true;
-    try {
-      final wasAdded = _inToView ?? await isInToView(widget.video.avid);
-      if (wasAdded) {
-        await deleteToView(widget.video.avid);
-      } else {
-        await addToView(avid: widget.video.avid);
-      }
-      if (!mounted) return;
-      setState(() => _inToView = !wasAdded);
-      pushTooltipInfo(context, wasAdded ? '已移出稍后再看' : '已加入稍后再看');
-    } catch (e) {
-      if (mounted) showAppError(context, e);
-    } finally {
-      _actionBusy = false;
-    }
-  }
-
-  Future<int?> _chooseAction(String title, List<String> labels) {
-    final ui = context.ui;
-    return showDialog<int>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: 760 * ui,
-          padding: EdgeInsets.all(28 * ui),
-          constraints: BoxConstraints(maxHeight: 800 * ui),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24 * ui),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 30 * ui,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              SizedBox(height: 22 * ui),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: [
-                    for (var i = 0; i < labels.length; i++)
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8 * ui),
-                        child: PinkButton(
-                          ui: ui,
-                          label: labels[i],
-                          onPressed: () => Navigator.of(dialogContext).pop(i),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 18 * ui),
-              PinkButton(
-                ui: ui,
-                label: '取消',
-                autofocus: true,
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _onCoinTapped() {
-    pushTooltipInfo(context, '功能暂未开放');
-  }
-
-  Future<void> _onFavoriteTapped() async {
-    if (_actionBusy || !_requireLogin()) return;
-    _actionBusy = true;
-    try {
-      final folders = await videoFavoriteFolders(
-        loginInfoNotifier.value.mid!,
-        widget.video.avid,
-      );
-      if (!mounted) return;
-      if (folders.isEmpty) {
-        pushTooltipInfo(context, '请先在 B 站创建收藏夹');
-        return;
-      }
-      final selected = await _chooseAction('选择收藏夹 · 已收藏可取消', [
-        for (final f in folders) '${f.selected ? '取消收藏' : '添加收藏'} · ${f.title}',
-      ]);
-      if (selected == null || !mounted) return;
-      final folder = folders[selected];
-      await changeVideoFavorite(
-        widget.video.avid,
-        folder.id,
-        add: !folder.selected,
-      );
-      if (!mounted) return;
-      setState(
-        () => widget.relation.favorite =
-            !folder.selected ||
-            folders.any((f) => f.id != folder.id && f.selected),
-      );
-      pushTooltipInfo(context, folder.selected ? '已从该收藏夹移除' : '收藏成功');
-    } catch (e) {
-      if (mounted) showAppError(context, e);
-    } finally {
-      _actionBusy = false;
-    }
-  }
+  Widget _buildRelations(double ui) =>
+      VideoActions(video: widget.video, relation: widget.relation);
 
   Future<void> _onFollowTapped() async {
     if (!loginInfoNotifier.value.isLogin) {
@@ -675,53 +472,16 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     }
   }
 
-  Widget _buildDescription(double ui) {
-    final desc = widget.video.desc.trim();
-    return DpadFocusable(
-      onSelect: () => showDialog(
-        context: context,
-        barrierColor: Colors.black.withValues(alpha: 0.5),
-        barrierDismissible: false,
-        builder: (dialogContext) => _buildCompleteDesc(dialogContext, ui),
-      ),
-      builder: pinkFocusEffect(
-        ui: ui,
-        radius: 16 * ui,
-        borderWidth: 2.5 * ui,
-        backgroundColor: focusableSurfaceColor,
-        focusedBackgroundColor: Colors.white,
-        scale: 1.02,
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16 * ui, 6 * ui, 14 * ui, 6 * ui),
-        child: Row(
-          children: [
-            Expanded(
-              child: FixedLineAdaptiveText(
-                desc.isEmpty ? 'UP主未填写简介' : desc,
-                line: 2,
-                lineHeight: 1.35,
-                maxFontSize: 24 * ui,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: desc.isEmpty
-                      ? Colors.grey.shade500
-                      : Colors.grey.shade700,
-                ),
-              ),
-            ),
-            SizedBox(width: 10 * ui),
-            Icon(
-              Icons.unfold_more_rounded,
-              size: 26 * ui,
-              color: Colors.grey.shade500,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildDescription(double ui) => DetailDescription(
+    ui: ui,
+    desc: widget.video.desc.trim(),
+    onOpen: () => showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      barrierDismissible: false,
+      builder: (dialogContext) => _buildCompleteDesc(dialogContext, ui),
+    ),
+  );
 
   Widget _buildOtherInfo(double ui) {
     return Padding(
@@ -750,7 +510,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
                       ),
                     ),
                     SizedBox(width: 8 * ui),
-                    _UpBadge(ui: ui),
+                    DetailUpBadge(ui: ui),
                   ],
                 ),
                 SizedBox(height: 6 * ui),
@@ -938,24 +698,27 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
           Expanded(
             child: ValueListenableBuilder(
               valueListenable: _currentEpisodeCid,
-              builder: (context, cid, _) => ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.video.episodes.length,
-                // 上下留白：避免卡片放大和焦点光晕被列表视口裁掉
-                padding: EdgeInsets.symmetric(
-                  horizontal: 14 * ui,
-                  vertical: 14 * ui,
+              builder: (context, cid, _) => HorizontalRailBoundary(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.video.episodes.length,
+                  // 上下留白：避免卡片放大和焦点光晕被列表视口裁掉
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14 * ui,
+                    vertical: 14 * ui,
+                  ),
+                  separatorBuilder: (context, index) =>
+                      SizedBox(width: 12 * ui),
+                  itemBuilder: (context, index) {
+                    final episode = widget.video.episodes[index];
+                    return _EpisodeCard(
+                      ui: ui,
+                      episode: episode,
+                      selected: episode.cid == cid,
+                      onPressed: () => _onEpisodeTapped(episode),
+                    );
+                  },
                 ),
-                separatorBuilder: (context, index) => SizedBox(width: 12 * ui),
-                itemBuilder: (context, index) {
-                  final episode = widget.video.episodes[index];
-                  return _EpisodeCard(
-                    ui: ui,
-                    episode: episode,
-                    selected: episode.cid == cid,
-                    onPressed: () => _onEpisodeTapped(episode),
-                  );
-                },
               ),
             ),
           ),
@@ -1036,102 +799,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
 }
 
 // 操作按钮（等宽胶囊：图标+数字，已选/焦点状态清晰）
-class _RelationAction extends StatelessWidget {
-  final double ui;
-  final IconData? icon;
-  final IconData? iconFont;
-  final double iconScale;
-  final String? label;
-  final bool active; // 语义上的已选（已点赞/投币/收藏）
-  final VoidCallback onPressed;
-
-  const _RelationAction({
-    required this.ui,
-    this.icon,
-    this.iconFont,
-    this.iconScale = 1,
-    this.label,
-    this.active = false,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? biliPink : Colors.grey.shade600;
-    Widget iconWidget = Icon(
-      iconFont ?? icon,
-      size: 30 * ui * iconScale,
-      color: color,
-    );
-
-    return DpadFocusable(
-      onSelect: onPressed,
-      builder: pinkFocusEffect(
-        ui: ui,
-        radius: 16 * ui,
-        borderWidth: 2.5 * ui,
-        backgroundColor: active
-            ? biliPink.withValues(alpha: 0.16)
-            : focusableSurfaceColor,
-        focusedBackgroundColor: Colors.white,
-        scale: 1.05,
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 12 * ui),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            iconWidget,
-            if (label != null) ...[
-              SizedBox(width: 8 * ui),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label!,
-                    maxLines: 1,
-                    style: TextStyle(
-                      fontSize: 22 * ui,
-                      fontWeight: FontWeight.w600,
-                      color: active ? biliPink : Colors.grey.shade800,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // UP主标签
-class _UpBadge extends StatelessWidget {
-  final double ui;
-
-  const _UpBadge({required this.ui});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10 * ui, vertical: 4 * ui),
-      decoration: BoxDecoration(
-        color: biliPink.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8 * ui),
-      ),
-      child: Text(
-        'UP主',
-        style: TextStyle(
-          fontSize: 18 * ui,
-          fontWeight: FontWeight.w600,
-          color: biliPink,
-        ),
-      ),
-    );
-  }
-}
-
 // 关注按钮
 class _FollowButton extends StatelessWidget {
   final double ui;

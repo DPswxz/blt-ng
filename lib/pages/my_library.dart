@@ -39,7 +39,7 @@ Future<void> playLibraryEpisode(
       title: season.title,
       cover: episode.cover,
       desc: '',
-      duration: Duration.zero,
+      duration: episode.duration,
       stat: Stat.fromJson({}),
       userMid: 0,
       userName: '哔哩哔哩番剧',
@@ -48,9 +48,10 @@ Future<void> playLibraryEpisode(
       cid: episode.cid!,
       episodes: libraryPlaybackEpisodes(episodes ?? [episode]),
     );
-    Get.to(
+    await Get.to(
       () => VideoPlayerPage(
         video: video,
+        seasonId: season.id,
         cid: episode.cid!,
         danmu: danmu,
         ha: true,
@@ -75,7 +76,7 @@ List<Episode> libraryPlaybackEpisodes(List<LibraryEntry> entries) => [
         cid: entries[i].cid!,
         episodeId: entries[i].id,
         title: entries[i].title,
-        duration: Duration.zero,
+        duration: entries[i].duration,
       ),
 ];
 
@@ -157,6 +158,7 @@ class _MyFavoritesState extends State<MyFavorites> {
             padding: EdgeInsets.all(24 * context.ui),
             child: LibraryCollectionPane(
               title: folder.title,
+              folderView: true,
               onBack: () => Navigator.of(routeContext).pop(),
               loader: (page) => listFavoriteVideos(folder.id, page: page),
               onRemove: (item) =>
@@ -191,6 +193,7 @@ class LibraryCollectionPane extends StatefulWidget {
   final FutureOr<void> Function(LibraryEntry) onOpen;
   final VoidCallback? onBack;
   final bool showHeader;
+  final bool folderView;
   final Future<void> Function(LibraryEntry)? onRemove;
   final LibraryCollectionController? controller;
   const LibraryCollectionPane({
@@ -200,6 +203,7 @@ class LibraryCollectionPane extends StatefulWidget {
     required this.onOpen,
     this.onBack,
     this.showHeader = true,
+    this.folderView = false,
     this.onRemove,
     this.controller,
   });
@@ -377,7 +381,11 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
       canPop: widget.onBack == null || !widget.showHeader,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && widget.onBack != null && widget.showHeader) {
-          _focusControl(_backFocus);
+          if (widget.folderView) {
+            widget.onBack!();
+          } else {
+            _focusControl(_backFocus);
+          }
         }
       },
       child: Column(
@@ -391,7 +399,7 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
               ),
               child: Row(
                 children: [
-                  if (widget.onBack != null) ...[
+                  if (widget.onBack != null && !widget.folderView) ...[
                     Focus(
                       focusNode: _backFocus,
                       canRequestFocus: false,
@@ -418,7 +426,7 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
                       ),
                     ),
                   ),
-                  if (widget.onRemove != null) ...[
+                  if (widget.onRemove != null && !widget.folderView) ...[
                     Text(
                       '菜单键 / 长按移除',
                       style: TextStyle(
@@ -428,15 +436,16 @@ class _LibraryCollectionPaneState extends State<LibraryCollectionPane> {
                     ),
                     SizedBox(width: 16 * ui),
                   ],
-                  PinkButton(
-                    ui: ui,
-                    height: 42,
-                    fontSize: 20,
-                    horizontalPadding: 18,
-                    label: '刷新',
-                    icon: Icons.refresh_rounded,
-                    onPressed: () => _load(reset: true),
-                  ),
+                  if (!widget.folderView)
+                    PinkButton(
+                      ui: ui,
+                      height: 42,
+                      fontSize: 20,
+                      horizontalPadding: 18,
+                      label: '刷新',
+                      icon: Icons.refresh_rounded,
+                      onPressed: () => _load(reset: true),
+                    ),
                 ],
               ),
             ),

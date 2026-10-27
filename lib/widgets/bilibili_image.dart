@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:blt/apis/bilibili/client.dart' show bilibiliHttpClient;
+import 'package:blt/utils/image_transport.dart';
 import 'package:blt/consts/assets.dart';
 import 'package:blt/consts/bilibili.dart' show coverSizeRatio;
 import 'package:blt/utils/log.dart';
@@ -21,7 +23,7 @@ class _BilibiliCacheManager extends CacheManager with ImageCacheManager {
           'libCachedImageData',
           stalePeriod: const Duration(days: 7),
           maxNrOfCacheObjects: 160,
-          fileService: HttpFileService()..concurrentFetches = 4,
+          fileService: BilibiliImageFileService(),
         ),
       );
 }
@@ -55,7 +57,7 @@ class BilibiliNetworkImageProvider extends CachedNetworkImageProvider {
       );
 }
 
-class BilibiliNetworkImage extends StatelessWidget {
+class BilibiliNetworkImage extends StatefulWidget {
   final String url;
   final PlaceholderWidgetBuilder? placeholder;
   final LoadingErrorWidgetBuilder? errorWidget;
@@ -66,6 +68,64 @@ class BilibiliNetworkImage extends StatelessWidget {
     this.errorWidget,
   });
   @override
+  State<BilibiliNetworkImage> createState() => _BilibiliNetworkImageState();
+}
+
+class _BilibiliNetworkImageState extends State<BilibiliNetworkImage>
+    with WidgetsBindingObserver {
+  Timer? _retryTimer;
+  int _attempt = 0;
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(BilibiliNetworkImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _retryTimer?.cancel();
+      _attempt = 0;
+      _failed = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _failed && mounted) {
+      _retryTimer?.cancel();
+      setState(() {
+        _attempt++;
+        _failed = false;
+      });
+    }
+  }
+
+  Widget _error(BuildContext context, String url, Object error) {
+    _failed = true;
+    if (_attempt < 2 && !(_retryTimer?.isActive ?? false)) {
+      _retryTimer = Timer(Duration(seconds: _attempt == 0 ? 3 : 12), () {
+        if (mounted) {
+          setState(() {
+            _attempt++;
+            _failed = false;
+          });
+        }
+      });
+    }
+    return (widget.errorWidget ?? _defaultErrorWidget)(context, url, error);
+  }
+
+  @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final width = imageDecodeWidth(
@@ -73,7 +133,8 @@ class BilibiliNetworkImage extends StatelessWidget {
         MediaQuery.devicePixelRatioOf(context),
       );
       return CachedNetworkImage(
-        imageUrl: thumbnailUrl(url, width),
+        key: ValueKey('${widget.url}:$_attempt'),
+        imageUrl: thumbnailUrl(widget.url, width),
         cacheManager: bilibiliImageCache,
         memCacheWidth: width,
         maxWidthDiskCache: width,
@@ -81,8 +142,8 @@ class BilibiliNetworkImage extends StatelessWidget {
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
         httpHeaders: bilibiliHttpClient.options.headers.cast<String, String>(),
-        placeholder: placeholder ?? _defaultPlaceholder,
-        errorWidget: errorWidget ?? _defaultErrorWidget,
+        placeholder: widget.placeholder ?? _defaultPlaceholder,
+        errorWidget: _error,
       );
     },
   );

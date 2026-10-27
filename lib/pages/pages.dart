@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:blt/utils/sidebar_focus_policy.dart';
 import 'package:blt/consts/color.dart';
 import 'package:blt/icons/iconfont.dart';
@@ -51,6 +52,7 @@ class Page extends StatefulWidget {
 
 class _PageState extends State<Page> {
   bool _exitDialogOpen = false;
+  Timer? _exitBackTimer;
   final _sidebarRegion = FocusNode(
     debugLabel: 'main-sidebar',
     canRequestFocus: false,
@@ -118,6 +120,7 @@ class _PageState extends State<Page> {
 
   @override
   void dispose() {
+    _exitBackTimer?.cancel();
     _sidebarRegion.dispose();
     _contentRegion.dispose();
     _currentPageIndex.dispose();
@@ -143,6 +146,8 @@ class _PageState extends State<Page> {
 
     final index = _tabs.indexOf(tab);
     if (_currentPageIndex.value != index) {
+      _exitBackTimer?.cancel();
+      _exitBackTimer = null;
       if (tab.child is SettingPage || tab.child is UserInfoPage) {
         tab.onTappedListener.value++;
       }
@@ -156,6 +161,19 @@ class _PageState extends State<Page> {
 
   Future<void> _handleBack() async {
     if (_exitDialogOpen) return;
+    if (_tabs[_currentPageIndex.value].homePage) {
+      if (_exitBackTimer?.isActive == true) {
+        _exitBackTimer?.cancel();
+        _exitBackTimer = null;
+        await SystemNavigator.pop();
+      } else {
+        _exitBackTimer = Timer(const Duration(seconds: 3), () {
+          _exitBackTimer = null;
+        });
+        pushTooltipInfo(context, '再按一次返回退出应用');
+      }
+      return;
+    }
     if (_tabs[_currentPageIndex.value].child is SearchPage) {
       _searchKey.currentState?.dismissInput();
     }

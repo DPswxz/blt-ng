@@ -11,6 +11,7 @@ class LibraryEntry {
   final String badge;
   final MediaCardInfo? video;
   final int? aid, cid;
+  final Duration duration;
   const LibraryEntry({
     required this.id,
     required this.title,
@@ -20,6 +21,7 @@ class LibraryEntry {
     this.video,
     this.aid,
     this.cid,
+    this.duration = Duration.zero,
   });
 }
 
@@ -249,6 +251,7 @@ List<LibraryEntry> parseSeasonEpisodes(Map<String, dynamic> data) {
         badge: seasonAccessBadge(d),
         aid: jsonInt(d['aid']),
         cid: jsonInt(d['cid']),
+        duration: Duration(milliseconds: jsonInt(d['duration'])),
       ),
     );
   }
@@ -256,12 +259,35 @@ List<LibraryEntry> parseSeasonEpisodes(Map<String, dynamic> data) {
 }
 
 class SeasonDetail {
+  final String uploaderAvatar, uploaderName, categoryLine;
+  final int uploaderMid, uploaderFollowers;
+  final bool uploaderFollowing;
   final int id, type, ratingCount, views, danmaku, follows;
+  final int lastEpisodeId;
   final String title, cover, description, rating, metadata, actors, staff;
   final List<LibraryEntry> episodes;
   bool followed;
   SeasonDetail.fromJson(Map<String, dynamic> d)
     : id = jsonInt(d['season_id']),
+      uploaderAvatar = jsonString(jsonMap(d['up_info'])?['avatar']),
+      uploaderName = jsonString(
+        jsonMap(d['up_info'])?['uname'],
+        fallback: '哔哩哔哩番剧',
+      ),
+      uploaderMid = jsonInt(jsonMap(d['up_info'])?['mid']),
+      uploaderFollowers = jsonInt(jsonMap(d['up_info'])?['follower']),
+      uploaderFollowing = jsonInt(jsonMap(d['up_info'])?['is_follow']) > 0,
+      categoryLine = [
+        (jsonList(d['styles']) ?? []).map((v) => '$v').join(' / '),
+        jsonString(jsonMap(d['publish'])?['pub_time']).split('-').first,
+        jsonString(
+          jsonMap(d['new_ep'])?['desc'],
+          fallback: jsonString(jsonMap(d['new_ep'])?['index_show']),
+        ),
+      ].where((s) => s.isNotEmpty).join(' · '),
+      lastEpisodeId = jsonInt(
+        jsonMap(jsonMap(d['user_status'])?['progress'])?['last_ep_id'],
+      ),
       type = jsonInt(d['type'], fallback: 1),
       title = jsonString(d['title']),
       cover = jsonString(d['cover']),
@@ -299,6 +325,18 @@ Future<SeasonDetail> getSeasonDetail(int season) async => SeasonDetail.fromJson(
       ) ??
       {},
 );
+
+Future<SeasonDetail> getSeasonDetailByEpisode(int episode) async =>
+    SeasonDetail.fromJson(
+      jsonMap(
+            await bilibiliRequest(
+              'GET',
+              'https://api.bilibili.com/pgc/view/web/season',
+              queries: {'ep_id': episode},
+            ),
+          ) ??
+          {},
+    );
 
 Future<void> changeSeasonFollow(int season, {required bool follow}) async {
   final csrf = (await loadCookie())

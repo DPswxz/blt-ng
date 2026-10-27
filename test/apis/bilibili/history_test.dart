@@ -3,6 +3,8 @@ import 'package:blt/apis/bilibili/history.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:blt/storages/auth.dart' show saveCookie;
+import 'dart:io' show Cookie;
 
 DioAdapter _mock() => DioAdapter(dio: bilibiliHttpClient);
 
@@ -63,6 +65,39 @@ void main() {
 
   group('listHistory', () {
     const url = 'https://api.bilibili.com/x/web-interface/history/cursor';
+    test('历史包含番剧，保留ssid和epid并过滤非视频', () async {
+      _mock().onGet(
+        url,
+        queryParameters: {'type': 'all', 'ps': 20},
+        (s) => s.reply(200, {
+          'code': 0,
+          'data': {
+            'cursor': {'max': 7, 'business': 'pgc'},
+            'list': [
+              {
+                'title': '番剧',
+                'kid': 7,
+                'history': {
+                  'oid': 102,
+                  'epid': 12,
+                  'cid': 202,
+                  'business': 'pgc',
+                },
+              },
+              {
+                'title': '直播',
+                'history': {'oid': 500, 'business': 'live'},
+              },
+            ],
+          },
+        }),
+      );
+      final (_, videos) = await listHistory();
+      expect(videos.length, 1);
+      expect(videos.single.avid, 102);
+      expect(videos.single.seasonId, 7);
+      expect(videos.single.episodeId, 12);
+    });
 
     test('正常解析游标与列表', () async {
       final adapter = _mock();
@@ -71,7 +106,11 @@ void main() {
         (server) => server.reply(200, {
           'code': 0,
           'data': {
-            'cursor': {'max': 123, 'view_at': 1700000000, 'business': 'archive'},
+            'cursor': {
+              'max': 123,
+              'view_at': 1700000000,
+              'business': 'archive',
+            },
             'list': [_historyItem()],
           },
         }),
@@ -89,13 +128,14 @@ void main() {
         (server) => server.reply(200, {
           'code': 0,
           'data': {
-            'cursor': {'max': 123, 'view_at': 1700000000, 'business': 'archive'},
+            'cursor': {
+              'max': 123,
+              'view_at': 1700000000,
+              'business': 'archive',
+            },
             'list': [
               _historyItem(),
-              {
-                'title': '缺 history 的坏项',
-                'goto': 'av',
-              },
+              {'title': '缺 history 的坏项', 'goto': 'av'},
               'not-a-map',
             ],
           },
@@ -109,11 +149,23 @@ void main() {
 
     test('data 为空时不抛异常', () async {
       final adapter = _mock();
-      adapter.onGet(url, (server) => server.reply(200, {'code': 0, 'data': null}));
+      adapter.onGet(
+        url,
+        (server) => server.reply(200, {'code': 0, 'data': null}),
+      );
 
       final (cursor, videos) = await listHistory();
       expect(cursor.max, 0);
       expect(videos, isEmpty);
     });
+  });
+  test('删除番剧历史使用pgc系列标识，不误删普通稿件', () async {
+    await saveCookie([Cookie('bili_jct', 'fake-csrf')]);
+    _mock().onPost(
+      'https://api.bilibili.com/x/v2/history/delete',
+      data: {'kid': 'pgc_7', 'csrf': 'fake-csrf'},
+      (s) => s.reply(200, {'code': 0}),
+    );
+    await deleteHistory(7, business: 'pgc');
   });
 }
