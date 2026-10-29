@@ -4,6 +4,7 @@
 // 使用方式：在模块内缓存实例，例如 `final _log = log('bilibili');`
 
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:logger/logger.dart';
@@ -19,6 +20,9 @@ final List<LogOutput> _outputs = [ConsoleOutput()];
 Future<void> initFileLogging({Directory? directory}) async {
   try {
     final dir = directory ?? await getApplicationDocumentsDirectory();
+    for (final output in _outputs.whereType<RollingFileOutput>()) {
+      await output.flush();
+    }
     _outputs.removeWhere((output) => output is RollingFileOutput);
     _outputs.add(RollingFileOutput(File('${dir.path}/$_logFileName')));
   } catch (_) {
@@ -76,6 +80,11 @@ class RollingFileOutput extends LogOutput {
   final File file;
   final int maxBytes;
   final int backups;
+  Future<void> _pending = Future<void>.value();
+  int _pendingBytes = 0;
+  static const _maxPendingBytes = 256 * 1024;
+
+  Future<void> flush() => _pending;
 
   RollingFileOutput(
     this.file, {
@@ -85,28 +94,36 @@ class RollingFileOutput extends LogOutput {
 
   @override
   void output(OutputEvent event) {
-    try {
-      final text = '${event.lines.join('\n')}\n';
-      if (file.existsSync() && file.lengthSync() + text.length > maxBytes) {
-        _rotate();
+    final bytes = utf8.encode('${event.lines.join('\n')}\n');
+    // Slow TV storage must not block rendering or build an unbounded queue.
+    if (_pendingBytes + bytes.length > _maxPendingBytes) return;
+    _pendingBytes += bytes.length;
+    _pending = _pending.then((_) async {
+      try {
+        if (await file.exists() &&
+            await file.length() + bytes.length > maxBytes) {
+          await _rotate();
+        }
+        await file.writeAsBytes(bytes, mode: FileMode.append);
+      } catch (_) {
+        // A failed write must not poison later writes or affect playback.
+      } finally {
+        _pendingBytes -= bytes.length;
       }
-      file.writeAsStringSync(text, mode: FileMode.append, flush: true);
-    } catch (_) {
-      // 日志写入失败不影响主流程
-    }
+    });
   }
 
-  void _rotate() {
+  Future<void> _rotate() async {
     final oldest = File('${file.path}.$backups');
-    if (oldest.existsSync()) oldest.deleteSync();
+    if (await oldest.exists()) await oldest.delete();
     for (var i = backups - 1; i >= 1; i--) {
       final source = File('${file.path}.$i');
-      if (source.existsSync()) {
-        source.renameSync('${file.path}.${i + 1}');
+      if (await source.exists()) {
+        await source.rename('${file.path}.${i + 1}');
       }
     }
-    if (file.existsSync()) {
-      file.renameSync('${file.path}.1');
+    if (await file.exists()) {
+      await file.rename('${file.path}.1');
     }
   }
 }

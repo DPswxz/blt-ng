@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:blt/utils/tcl_video_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,33 @@ import 'package:media_kit/media_kit.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('native decoder releases before event cancellation completes', () async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    const channel = MethodChannel('blt/media3/99');
+    const events = MethodChannel('blt/media3/99/events');
+    final cancelPending = Completer<void>();
+    var released = false;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'release') released = true;
+      return null;
+    });
+    messenger.setMockMethodCallHandler(events, (call) async {
+      if (call.method == 'cancel') await cancelPending.future;
+      return null;
+    });
+    final player = TclExoPlayer()..attach(99);
+    await Future<void>.delayed(Duration.zero);
+    final disposing = player.dispose();
+    await Future<void>.delayed(Duration.zero);
+    expect(released, isTrue);
+    await player.play();
+    cancelPending.complete();
+    await disposing;
+    await player.dispose();
+    messenger.setMockMethodCallHandler(channel, null);
+    messenger.setMockMethodCallHandler(events, null);
+  });
   test(
     'ExoPlayer merges video/audio atomically and preserves seek/rate/loop commands',
     () async {

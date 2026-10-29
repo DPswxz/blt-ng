@@ -51,7 +51,7 @@ void main() {
     expect(content, contains('[INFO] [test-tag] hello 日志'));
   });
 
-  test('RollingFileOutput 超过上限时滚动并限制备份数', () {
+  test('RollingFileOutput 超过上限时滚动并限制备份数', () async {
     final file = File('${tempDir.path}/roll.log');
     final output = RollingFileOutput(file, maxBytes: 50, backups: 2);
 
@@ -61,6 +61,7 @@ void main() {
       );
     }
 
+    await output.flush();
     expect(file.existsSync(), true);
     expect(File('${file.path}.1').existsSync(), true);
     expect(File('${file.path}.2').existsSync(), true);
@@ -68,12 +69,35 @@ void main() {
     expect(File('${file.path}.3').existsSync(), false);
   });
 
-  test('文件不可写时不抛异常', () {
+  test('文件不可写时不抛异常', () async {
     // 用一个非法路径触发写入失败
-    final output = RollingFileOutput(File('${tempDir.path}/no-such-dir/x/y.log'));
+    final output = RollingFileOutput(
+      File('${tempDir.path}/no-such-dir/x/y.log'),
+    );
     expect(
       () => output.output(OutputEvent(LogEvent(Level.info, ''), ['x'])),
       returnsNormally,
     );
+    await output.flush();
+  });
+  test('异步日志保持顺序，写入失败后能恢复且按 UTF8 字节滚动', () async {
+    final file = File('${tempDir.path}/nested/test.log');
+    final output = RollingFileOutput(file, maxBytes: 12, backups: 2);
+    output.output(OutputEvent(LogEvent(Level.info, ''), ['missing-dir']));
+    await output.flush();
+    await file.parent.create();
+    output.output(OutputEvent(LogEvent(Level.info, ''), ['中文']));
+    output.output(OutputEvent(LogEvent(Level.info, ''), ['测试']));
+    await output.flush();
+    expect(await File('${file.path}.1').readAsString(), '中文\n');
+    expect(await file.readAsString(), '测试\n');
+  });
+  test('日志洪峰有界，拒绝超大记录后仍可继续记录', () async {
+    final file = File('${tempDir.path}/bounded.log');
+    final output = RollingFileOutput(file);
+    output.output(OutputEvent(LogEvent(Level.info, ''), ['x' * (256 * 1024)]));
+    output.output(OutputEvent(LogEvent(Level.info, ''), ['kept']));
+    await output.flush();
+    expect(await file.readAsString(), 'kept\n');
   });
 }

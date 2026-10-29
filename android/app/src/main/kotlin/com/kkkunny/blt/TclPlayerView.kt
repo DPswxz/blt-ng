@@ -39,6 +39,7 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
     private val methods = MethodChannel(messenger, "blt/media3/$id")
     private val events = EventChannel(messenger, "blt/media3/$id/events")
     private var sink: EventChannel.EventSink? = null
+    private var eventsCancelled = false
     private var released = false
     private var decoder = "initializing"
     private var dropped = 0
@@ -88,8 +89,16 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
             }
         })
         events.setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) { sink = eventSink; emit() }
-            override fun onCancel(arguments: Any?) { sink = null }
+            override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) {
+                eventsCancelled = false
+                sink = eventSink
+                emit()
+            }
+            override fun onCancel(arguments: Any?) {
+                eventsCancelled = true
+                sink = null
+                if (released) events.setStreamHandler(null)
+            }
         })
         methods.setMethodCallHandler { call, result ->
             if (released && call.method != "release") { result.error("released", "播放器已关闭", null); return@setMethodCallHandler }
@@ -103,6 +112,11 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
                         val video = source(call.argument<String>("video")!!)
                         val audio = call.argument<String>("audio")
                         val media = if (audio.isNullOrEmpty()) video else MergingMediaSource(true, true, video, source(audio))
+                        // Finish the old codec before replacing its stream. On T982,
+                        // reusing live video buffers across formats can exercise the
+                        // vendor UVM/GPU reallocation path seen in kernel panics.
+                        player.pause()
+                        player.stop()
                         dropped = 0; rendered = 0; decoder = "initializing"
                         player.setMediaSource(media, (call.argument<Number>("start")?.toLong() ?: 0L).coerceAtLeast(0))
                         player.prepare()
@@ -137,7 +151,7 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
         if (metrics) {
             val counters = player.videoDecoderCounters
             counters?.ensureUpdated()
-            data["log"] = "ExoPlayer decoder=$decoder size=${player.videoFormat?.width}x${player.videoFormat?.height} position=${player.currentPosition} buffered=${player.bufferedPosition} dropped=${counters?.droppedBufferCount ?: dropped} rendered=${counters?.renderedOutputBufferCount ?: 0} firstFrames=$rendered playing=${player.isPlaying}"
+            data["log"] = "ExoPlayer decoder=$decoder size=${player.videoFormat?.width}x${player.videoFormat?.height} position=${player.currentPosition} buffered=${player.bufferedPosition} dropped=$dropped rendered=${counters?.renderedOutputBufferCount ?: 0} firstFrames=$rendered playing=${player.isPlaying}"
         }
         sink?.success(data)
     }
@@ -145,10 +159,24 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
         if (released) return
         released = true
         handler.removeCallbacks(ticker)
+        // Stop releases the decoder while its real SurfaceView still exists.
+        // Clearing a live codec's surface first can make Media3 switch it to a
+        // dummy GPU surface, needlessly importing video DMA buffers into Mali.
+        player.pause()
+        player.stop()
+        player.clearMediaItems()
         player.clearVideoSurfaceView(surface)
         player.release()
+        if (eventsCancelled) events.setStreamHandler(null)
     }
     override fun getView(): View = frame
-    override fun dispose() { releasePlayer(); sink = null; methods.setMethodCallHandler(null); events.setStreamHandler(null) }
+    override fun dispose() {
+        releasePlayer()
+        sink = null
+        methods.setMethodCallHandler(null)
+        // Dart may cancel its subscription after the platform view is gone.
+        // Keep only this no-op cancel endpoint until that handshake finishes.
+        // onCancel then unregisters it, without retaining a codec or Surface.
+    }
     override fun onFlutterViewDetached() { if (!released) player.pause() }
 }

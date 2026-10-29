@@ -293,7 +293,13 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     final enable = widget.controller.enableNotifier.value;
     if (!enable) {
       _onClear();
+      _danmakuCache = null;
+      widget.controller._controller = null;
     }
+    // Clearing content alone leaves the package's periodic repaint timer alive.
+    // Unmount the canvas completely while disabled, so native video can play
+    // without continual Flutter/platform-view composition work.
+    if (mounted) setState(() {});
   }
 
   void _onClear() {
@@ -315,19 +321,21 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   @override
   Widget build(BuildContext context) {
     final ui = context.ui;
-    if (!_initDone) {
+    if (!_initDone || !widget.controller.enabled) {
       return const SizedBox();
     }
     // Size the entire canvas so fixed bottom comments also stay in the chosen region.
-    return Align(
-      alignment: Alignment.topCenter,
-      child: FractionallySizedBox(
-        widthFactor: 1,
-        heightFactor: _danmuArea / 100,
-        child: ClipRect(
-          child: DanmakuScreen(
-            createdController: (c) => widget.controller._controller = c,
-            option: _option(ui),
+    return RepaintBoundary(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: FractionallySizedBox(
+          widthFactor: 1,
+          heightFactor: _danmuArea / 100,
+          child: ClipRect(
+            child: DanmakuScreen(
+              createdController: (c) => widget.controller._controller = c,
+              option: _option(ui),
+            ),
           ),
         ),
       ),

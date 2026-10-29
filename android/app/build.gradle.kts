@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val stabilityTest = providers.gradleProperty("tclStabilityTest").orNull == "true"
+
 android {
     namespace = "com.kkkunny.blt"
     compileSdk = flutter.compileSdkVersion
@@ -16,7 +18,12 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = if (providers.gradleProperty("tclSideBySide").orNull == "true") "com.kkkunny.blt.tcl" else "com.kkkunny.blt"
+        applicationId = when {
+            stabilityTest -> "com.kkkunny.blt.tcl.stability"
+            providers.gradleProperty("tclSideBySide").orNull == "true" -> "com.kkkunny.blt.tcl"
+            else -> "com.kkkunny.blt"
+        }
+        manifestPlaceholders["bltAppLabel"] = if (stabilityTest) "blt-ng" else "BLT"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

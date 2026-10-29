@@ -12,6 +12,8 @@ class TclVideoController {
   final bool isExo;
   late final PlatformPlayer player;
   VideoController? _mpv;
+  Future<void>? _disposeFuture;
+  Future<void> dispose() => _disposeFuture ??= player.dispose();
   TclVideoController(String mode) : isExo = mode == 'auto' || mode == 'exo' {
     if (isExo) {
       player = TclExoPlayer();
@@ -214,15 +216,20 @@ class TclExoPlayer extends PlatformPlayer {
     if (_disposed) return;
     _disposed = true;
     if (!ready.isCompleted) ready.complete();
-    await _events?.cancel();
     try {
+      // Start native teardown immediately, before waiting for event-channel
+      // cancellation: the platform view's Surface may disappear in this frame.
       await _channel?.invokeMethod<void>('release');
     } on PlatformException {
       // The platform view may already have released the native player.
     } on MissingPluginException {
       // The platform view may already have released the native player.
     } finally {
-      await super.dispose();
+      try {
+        await _events?.cancel();
+      } finally {
+        await super.dispose();
+      }
     }
   }
 }

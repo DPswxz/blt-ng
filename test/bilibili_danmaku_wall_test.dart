@@ -7,6 +7,38 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   setupPageTestEnv();
+  testWidgets('关闭弹幕卸载画布并停止动画，再开启时重建可用画布', (t) async {
+    final controller = BilibiliDanmakuWallController(false);
+    await pumpPage(
+      t,
+      BilibiliDanmakuWall(
+        controller: controller,
+        cid: 1,
+        timeline: const Stream<Duration>.empty(),
+        playing: const Stream<bool>.empty(),
+      ),
+    );
+    await flush(t);
+    expect(find.byType(DanmakuScreen), findsNothing);
+    controller.enabled = true;
+    await flush(t);
+    expect(find.byType(DanmakuScreen), findsOneWidget);
+    controller.addDanmaku(DanmakuContentItem('测试滚动弹幕'));
+    await t.pump();
+    controller.enabled = false;
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 200));
+    expect(find.byType(DanmakuScreen), findsNothing);
+    expect(t.binding.transientCallbackCount, 0);
+    controller.enabled = true;
+    await flush(t);
+    expect(find.byType(DanmakuScreen), findsOneWidget);
+    controller.addDanmaku(DanmakuContentItem('重新启用后可用'));
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(milliseconds: 200));
+    controller.dispose();
+    expect(t.takeException(), isNull);
+  });
   testWidgets('显示区域和透明度实时更新真实弹幕画布，并保留持久设置', (t) async {
     final controller = BilibiliDanmakuWallController(true);
     await pumpPage(

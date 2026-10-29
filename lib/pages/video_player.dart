@@ -5,6 +5,7 @@ import 'package:blt/utils/request_scope.dart';
 import 'package:blt/widgets/danmaku_settings.dart';
 import 'dart:async';
 import 'package:blt/utils/playback_policy.dart';
+import 'package:blt/utils/playback_drop_monitor.dart';
 import 'package:blt/utils/log.dart';
 
 import 'package:blt/apis/bilibili/client.dart' show bilibiliHttpClient;
@@ -184,7 +185,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _videoReady.dispose();
     _screenFocusNode.dispose();
     _danmakuCtl.dispose();
-    _controller.player.dispose();
+    _controller.dispose().ignore();
     _currentCid.dispose();
     super.dispose();
   }
@@ -234,7 +235,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _onPlayError(String err) {
-    if (!mounted) return;
+    if (!mounted || _switchingDecoder) return;
     if (_controller.isExo) {
       log('playback').w(err);
       _recoverExo().ignore();
@@ -338,7 +339,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _pendingCodecError = false;
     try {
       if (_directOutput) {
-        if (!widget.recoveredNative) _replaceDecoder('gpu', recovered: true);
+        // Keep recovery off the GPU texture/copy path on T982. That path
+        // exercises the vendor video DMA-buffer import implicated in reboots.
+        if (!widget.recoveredNative) {
+          await _replaceDecoder('exo', recovered: true);
+        }
         return;
       }
       if (!_copyFallback) {
@@ -375,6 +380,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   // 切换视频备份地址后重新打开媒体，保留播放进度、弹幕时间轴与音轨
   Future<void> _restartPlayback() async {
     if (_videoUrls.isEmpty) return;
+    _dropMonitor.reset();
     final start = _controller.player.state.position;
     // 重置弹幕时间轴，避免重开后按旧时间轴推送导致长时间无弹幕
     _danmakuCtl.clear();
@@ -589,7 +595,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> _logDecoderState() async {
-    if (!mounted) return;
+    if (!mounted || _switchingDecoder) return;
     final state = _controller.player.state;
     log('playback').i(
       'sample mode=${widget.decoderMode} ready=${_videoReady.value} position=${state.position.inMilliseconds} playing=${state.playing} buffering=${state.buffering} buffered=${state.buffer.inMilliseconds}',
@@ -609,22 +615,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _acceptMetrics(String value) {
-    final match = RegExp(
-      r'decoderDrops=(\d+) renderDrops=(\d+)',
-    ).firstMatch(value);
-    if (match == null) return;
-    final dropped = int.parse(match[1]!) + int.parse(match[2]!);
-    final position = _controller.player.state.position;
-    final elapsed = _lastSamplePosition == null
-        ? 0
-        : (position - _lastSamplePosition!).inSeconds;
-    final delta = dropped - _lastDropped;
-    _lastSamplePosition = position;
-    _lastDropped = dropped;
+    final overloaded = _dropMonitor.sample(
+      value,
+      _controller.player.state.position,
+    );
     if (_autoQuality &&
-        elapsed >= 8 &&
-        elapsed <= 22 &&
-        delta >= 45 &&
+        overloaded &&
         _controller.player.state.playing &&
         !_recovering &&
         !_optimizing) {
@@ -682,12 +678,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   int _recoveryBudget = 8;
   bool _autoQuality = true;
   Quality? _attemptQuality;
-  int _lastDropped = 0;
-  Duration? _lastSamplePosition;
+  final _dropMonitor = PlaybackDropMonitor();
   bool _optimizing = false;
 
   Future<bool> _lowerAutomaticQuality() async {
-    if (!_autoQuality || _attemptQuality == null || _optimizing || !mounted) {
+    if (!_autoQuality ||
+        _attemptQuality == null ||
+        _optimizing ||
+        _switchingDecoder ||
+        !mounted) {
       return false;
     }
     _optimizing = true;
@@ -711,8 +710,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         );
         if (!mounted) return false;
         _currentQuality.value = quality;
-        _lastSamplePosition = null;
-        _lastDropped = 0;
+        _dropMonitor.reset();
         pushTooltipInfo(context, '已自动调整为 ${_qualityLabel(quality)}，优先流畅播放');
         return true;
       }
@@ -781,6 +779,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       bilibiliHttpClient.options.headers.cast<String, String>(),
       start,
     );
+    _dropMonitor.reset();
   }
 
   void _onPlayCompleted() {
@@ -908,7 +907,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
-  void _replaceDecoder(String mode, {bool recovered = false}) {
+  bool _switchingDecoder = false;
+
+  Future<void> _replaceDecoder(String mode, {bool recovered = false}) async {
+    if (_switchingDecoder || !mounted) return;
+    _switchingDecoder = true;
+    final position = _controller.player.state.position;
+    // Get.off keeps both pages alive during its transition. Release the old
+    // codec first rather than running MPV and Media3 against the vendor video
+    // driver at the same time. Page disposal reuses this same disposal future.
+    try {
+      await _controller.dispose();
+    } catch (error) {
+      _switchingDecoder = false;
+      if (mounted) pushTooltipError(context, '播放器未能安全释放，请先返回后重试');
+      return;
+    }
+    if (!mounted) return;
     Get.off(
       () => VideoPlayerPage(
         video: widget.video,
@@ -918,7 +933,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         vo: widget.vo,
         hwdec: widget.hwdec,
         decoderMode: mode,
-        initialPosition: _controller.player.state.position,
+        initialPosition: position,
         seasonId: widget.seasonId,
         recoveredNative: recovered,
       ),
@@ -936,7 +951,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
     if (!mounted || selected == null || selected == widget.decoderMode) return;
     await Settings.setString(Settings.pathDecoderMode, selected);
-    if (mounted) _replaceDecoder(selected);
+    if (mounted) await _replaceDecoder(selected);
   }
 
   Future<void> _onDefaultQualityTapped() async {
