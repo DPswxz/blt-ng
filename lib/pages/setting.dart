@@ -68,12 +68,12 @@ class _SettingPageState extends State<SettingPage> {
                 CustomSettingsDropdownTile<String>(
                   leading: const Icon(Icons.high_quality),
                   title: '进入视频默认画质',
-                  subtitle: '每个视频按默认画质进入，无对应画质或权限时选择较低档位。4K需要片源和账号支持。',
+                  subtitle:
+                      '每个视频按默认画质进入，无对应画质或权限时选择较低档位。4K、1080P 高码率需要片源支持及大会员权限。',
                   value:
                       defaultQualityLabels[_quality] ??
                       defaultQualityLabels[80]!,
                   items: defaultQualityLabels.values.toList(),
-                  autofocus: true,
                   onChanged: (v) => setState(() {
                     _quality = defaultQualityLabels.entries
                         .firstWhere((e) => e.value == v)

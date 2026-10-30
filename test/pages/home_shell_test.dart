@@ -43,7 +43,7 @@ void main() {
     expect(find.text('推荐视频A'), findsOneWidget);
   });
 
-  testWidgets('头像打开个人页面并保留侧栏，返回不切换栏目', (tester) async {
+  testWidgets('头像打开个人页面并保留侧栏，返回首页', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
@@ -54,8 +54,12 @@ void main() {
     expect(find.byType(Sidebar), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('账号管理'), findsOneWidget);
-    expect(find.text('退出 BLT？'), findsNothing);
+    expect(find.text('账号管理'), findsNothing);
+    expect(
+      tester.widget<Sidebar>(find.byType(Sidebar)).items.first.selected,
+      isTrue,
+    );
+    expect(find.text('退出 blt-ng？'), findsNothing);
   });
 
   testWidgets('侧栏搜索未切页向右正常进入当前内容，切页后向右进输入框，最后可直接确认退出', (tester) async {
@@ -123,13 +127,15 @@ void main() {
     final input = tester.widget<TextField>(find.byType(TextField));
     expect(input.focusNode!.hasFocus, isTrue);
     expect(input.readOnly, isTrue);
-    expect(sidebar.footer!.label, '退出');
-    sidebar.footer!.onTap();
+    expect(sidebar.footer, isNull);
+    await tester.binding.handlePopRoute();
+    await flush(tester);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('退出 BLT？'), findsOneWidget);
+    expect(find.text('退出 blt-ng？'), findsOneWidget);
     await tester.tap(find.text('继续观看'));
     await tester.pumpAndSettle();
-    expect(find.text('退出 BLT？'), findsNothing);
+    expect(find.text('退出 blt-ng？'), findsNothing);
     var exits = 0;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform, (call) async {
@@ -140,12 +146,49 @@ void main() {
       () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null),
     );
-    sidebar.footer!.onTap();
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(PinkButton, '退出'));
     await tester.pumpAndSettle();
     expect(exits, 1);
   });
+
+  for (final size in [
+    const Size(1280, 720),
+    const Size(1920, 1080),
+    const Size(3840, 2160),
+  ]) {
+    testWidgets('设置保留侧栏焦点，返回首页并确认退出 $size', (tester) async {
+      mockRecommend();
+      await pumpPage(tester, const app.Page(), size: size);
+      await flush(tester);
+      final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+      final setting = sidebar.items.singleWhere((e) => e.label == '设置');
+      setting.focusAnchor!.descendants
+          .where((n) => n.canRequestFocus && !n.skipTraversal)
+          .first
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await flush(tester);
+      expect(setting.focusAnchor!.hasFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(setting.focusAnchor!.hasFocus, isFalse);
+      await tester.binding.handlePopRoute();
+      await flush(tester);
+      expect(
+        tester.widget<Sidebar>(find.byType(Sidebar)).items.first.selected,
+        isTrue,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('退出 blt-ng？'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('继续观看'));
+      await tester.pumpAndSettle();
+    });
+  }
 
   testWidgets('内容左侧返回当前搜索图标，个人页返回头像', (tester) async {
     loginInfoNotifier.value = LoginInfo.login(
@@ -334,54 +377,20 @@ void main() {
 
     expect(find.text('历史视频A'), findsOneWidget);
   });
-  testWidgets('首页返回保留首页，不显示退出确认', (tester) async {
+  testWidgets('首页返回显示确认，取消后保留首页', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('退出 BLT？'), findsNothing);
+    expect(find.text('退出 blt-ng？'), findsOneWidget);
+    expect(find.textContaining('再按一次返回退出应用'), findsNothing);
+    await tester.tap(find.text('继续观看'));
+    await tester.pumpAndSettle();
     expect(find.text('推荐视频A'), findsOneWidget);
-    expect(find.textContaining('再按一次返回退出应用'), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('首页三秒内双返回退出，超时及切换栏目重置', (tester) async {
-    mockRecommend();
-    var exits = 0;
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'SystemNavigator.pop') exits++;
-      return null;
-    });
-    addTearDown(
-      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
-    );
-    await pumpPage(tester, const app.Page());
-    await flush(tester);
-    await tester.binding.handlePopRoute();
-    await tester.pump(const Duration(seconds: 4));
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(exits, 0);
-    await tester.tap(find.text('设置'));
-    await flush(tester);
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(exits, 0);
-    await tester.tap(find.text('首页'));
-    await flush(tester);
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(exits, 0);
-    await tester.binding.handlePopRoute();
-    await tester.pump();
-    expect(exits, 1);
-    await tester.pumpWidget(const SizedBox());
-  });
-
-  testWidgets('搜索页返回保留搜索栏目，不退出应用', (tester) async {
+  testWidgets('搜索页返回首页，不退出应用', (tester) async {
     mockRecommend();
     await pumpPage(tester, const app.Page());
     await flush(tester);
@@ -390,8 +399,8 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
-    expect(sidebar.items.singleWhere((e) => e.label == '搜索').selected, isTrue);
-    expect(find.text('退出 BLT？'), findsNothing);
+    expect(sidebar.items.singleWhere((e) => e.label == '首页').selected, isTrue);
+    expect(find.text('退出 blt-ng？'), findsNothing);
   });
   testWidgets('设置在主页面切换并保留侧栏，可返回首页', (tester) async {
     mockRecommend();
@@ -406,8 +415,11 @@ void main() {
     expect(sidebar.items.singleWhere((e) => e.label == '设置').selected, isTrue);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('偏好设置'), findsOneWidget);
-    expect(find.text('退出 BLT？'), findsNothing);
+    expect(
+      tester.widget<Sidebar>(find.byType(Sidebar)).items.first.selected,
+      isTrue,
+    );
+    expect(find.text('退出 blt-ng？'), findsNothing);
     await tester.tap(find.text('首页'));
     await flush(tester);
     expect(find.text('推荐视频A'), findsOneWidget);

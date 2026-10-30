@@ -32,8 +32,13 @@ void main() {
     expect(find.textContaining('每个视频按默认画质进入'), findsOneWidget);
     await tester.tap(find.text('进入视频默认画质'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('4K 超高清'));
+    await tester.tap(find.text('4K 超高清 · 大会员'));
     await tester.pumpAndSettle();
     expect(await Settings.getInt(Settings.pathDefaultQuality), 120);
+    await tester.tap(find.text('进入视频默认画质'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1080P 高码率 · 大会员'));
+    await tester.pumpAndSettle();
+    expect(await Settings.getInt(Settings.pathDefaultQuality), 112);
   });
 }

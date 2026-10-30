@@ -422,6 +422,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           _controller.player.state.position,
         ).ignore();
       }
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..removeCurrentSnackBar();
       return Get.back();
     }
     _lastBackTime = now;

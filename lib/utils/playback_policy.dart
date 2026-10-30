@@ -56,7 +56,8 @@ const decoderLabels = {
   'software': 'MPV 软件解码',
 };
 const defaultQualityLabels = {
-  120: '4K 超高清',
+  120: '4K 超高清 · 大会员',
+  112: '1080P 高码率 · 大会员',
   80: '1080P 高清',
   64: '720P 准高清',
   32: '480P 标清',
@@ -65,7 +66,9 @@ const defaultQualityLabels = {
 const preferredCodecLabels = {0: '自动（AVC 优先）', 7: 'AVC 优先', 12: 'HEVC 优先'};
 List<Quality> defaultQualityOrder(List<Quality> qualities, int maximum) {
   final order = smoothQualityOrder(qualities);
-  if (maximum == 120) return [...qualities.where((q) => q.id == 120), ...order];
+  if (maximum == 120 || maximum == 112) {
+    return [...qualities.where((q) => q.id == maximum), ...order];
+  }
   const levels = [80, 64, 74, 32, 16, 6];
   final cap = levels.indexOf(maximum);
   return order
