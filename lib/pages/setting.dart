@@ -8,6 +8,7 @@ import 'package:blt/widgets/cache_future_builder.dart';
 import 'package:blt/widgets/custom_setting_tiles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 class SettingPage extends StatefulWidget {
   final ValueListenable<int>? refreshListener;
@@ -17,6 +18,7 @@ class SettingPage extends StatefulWidget {
 }
 
 class _SettingPageState extends State<SettingPage> {
+  final _scrollController = ScrollController();
   int _quality = 80, _codec = 0;
   int _audio = 0;
   bool _danmakuEnabled = true;
@@ -42,6 +44,7 @@ class _SettingPageState extends State<SettingPage> {
   @override
   void dispose() {
     widget.refreshListener?.removeListener(_refresh);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -80,6 +83,30 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
+  Widget _scrollBoundary({required Widget child, required bool top}) => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: (_, event) {
+      final direction = top
+          ? LogicalKeyboardKey.arrowUp
+          : LogicalKeyboardKey.arrowDown;
+      if (event.logicalKey != direction || event is KeyUpEvent) {
+        return KeyEventResult.ignored;
+      }
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          top
+              ? _scrollController.position.minScrollExtent
+              : _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+      return KeyEventResult.handled;
+    },
+    child: child,
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
@@ -91,6 +118,7 @@ class _SettingPageState extends State<SettingPage> {
         }
         final ui = context.ui;
         return ListView(
+          controller: _scrollController,
           padding: EdgeInsets.all(24 * ui),
           children: [
             Padding(
@@ -106,21 +134,24 @@ class _SettingPageState extends State<SettingPage> {
             _sectionTitle(context, '播放设置'),
             CustomSettingsPanel(
               children: [
-                CustomSettingsDropdownTile<String>(
-                  leading: const Icon(Icons.high_quality),
-                  title: '进入视频默认画质',
-                  subtitle:
-                      '每个视频按默认画质进入，无对应画质或权限时选择较低档位。4K、1080P 高码率需要片源支持及大会员权限。',
-                  value:
-                      defaultQualityLabels[_quality] ??
-                      defaultQualityLabels[80]!,
-                  items: defaultQualityLabels.values.toList(),
-                  onChanged: (v) => setState(() {
-                    _quality = defaultQualityLabels.entries
-                        .firstWhere((e) => e.value == v)
-                        .key;
-                    Settings.setInt(Settings.pathDefaultQuality, _quality);
-                  }),
+                _scrollBoundary(
+                  top: true,
+                  child: CustomSettingsDropdownTile<String>(
+                    leading: const Icon(Icons.high_quality),
+                    title: '进入视频默认画质',
+                    subtitle:
+                        '每个视频按默认画质进入，无对应画质或权限时选择较低档位。4K、1080P 高码率需要片源支持及大会员权限。',
+                    value:
+                        defaultQualityLabels[_quality] ??
+                        defaultQualityLabels[80]!,
+                    items: defaultQualityLabels.values.toList(),
+                    onChanged: (v) => setState(() {
+                      _quality = defaultQualityLabels.entries
+                          .firstWhere((e) => e.value == v)
+                          .key;
+                      Settings.setInt(Settings.pathDefaultQuality, _quality);
+                    }),
+                  ),
                 ),
                 CustomSettingsDropdownTile<String>(
                   leading: const Icon(Icons.memory),
@@ -248,16 +279,22 @@ class _SettingPageState extends State<SettingPage> {
                     Settings.setInt(Settings.pathDanmuSpeed, _speed);
                   }),
                 ),
-                CustomSettingsDropdownTile<int>(
-                  leading: const Icon(Icons.filter_alt_outlined),
-                  title: '弹幕屏蔽权重',
-                  subtitle: '权重越大，显示的弹幕越少。',
-                  value: _weight,
-                  items: List.generate(11, (i) => i),
-                  onChanged: (value) => setState(() {
-                    _weight = value;
-                    Settings.setInt(Settings.pathDanmuBlockWeightSwitch, value);
-                  }),
+                _scrollBoundary(
+                  top: false,
+                  child: CustomSettingsDropdownTile<int>(
+                    leading: const Icon(Icons.filter_alt_outlined),
+                    title: '弹幕屏蔽权重',
+                    subtitle: '权重越大，显示的弹幕越少。',
+                    value: _weight,
+                    items: List.generate(11, (i) => i),
+                    onChanged: (value) => setState(() {
+                      _weight = value;
+                      Settings.setInt(
+                        Settings.pathDanmuBlockWeightSwitch,
+                        value,
+                      );
+                    }),
+                  ),
                 ),
               ],
             ),

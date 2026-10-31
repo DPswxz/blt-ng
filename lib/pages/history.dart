@@ -67,8 +67,9 @@ class _HistoryPageState extends State<HistoryPage> {
     _provider.addAll(medias);
   }
 
-  void _onVideoTapped(_, MediaCardInfo video) {
-    Get.to(() => historyDetailPage(video));
+  Future<void> _onVideoTapped(_, MediaCardInfo video) async {
+    await Get.to(() => historyDetailPage(video));
+    if (mounted) await _onRefresh();
   }
 
   @override

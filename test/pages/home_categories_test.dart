@@ -96,13 +96,58 @@ void main() {
       await flush(t);
       expect(find.text('第一话'), findsWidgets);
       expect(find.text('大会员'), findsNothing);
-      await t.tap(find.text('返回'));
+      await t.binding.handlePopRoute();
       await flush(t);
       expect(find.text('免费番剧'), findsOneWidget);
       await t.tap(find.text('推荐'));
       await flush(t);
       expect(find.text('推荐视频'), findsOneWidget);
       expect(t.takeException(), isNull, reason: '$size');
+      await t.pumpWidget(const SizedBox());
+      refresh.dispose();
+    }
+  });
+  testWidgets('首页电影栏目使用电影索引并支持分页和多尺寸布局', (t) async {
+    mockFeeds();
+    final http = mockHttp();
+    http.onGet(
+      '$base/pgc/season/index/result',
+      queryParameters: {
+        'season_type': 2,
+        'type': 1,
+        'page': 1,
+        'pagesize': 20,
+        'order': 3,
+        'sort': 0,
+      },
+      (s) => s.reply(200, {
+        'code': 0,
+        'data': {
+          'has_next': 0,
+          'list': [
+            {'season_id': 42, 'title': '测试电影'},
+          ],
+        },
+      }),
+    );
+    for (final size in const [
+      Size(1280, 720),
+      Size(1920, 1080),
+      Size(3840, 2160),
+      Size(1600, 1200),
+      Size(2560, 1080),
+    ]) {
+      final refresh = ValueNotifier(0);
+      await pumpPage(
+        t,
+        RecommendPage(refresh, key: ValueKey(size)),
+        size: size,
+      );
+      await flush(t);
+      await t.tap(find.text('电影'));
+      await flush(t);
+      expect(find.text('测试电影'), findsOneWidget);
+      expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox());
       refresh.dispose();
     }

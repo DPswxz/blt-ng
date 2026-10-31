@@ -7,10 +7,45 @@ import 'package:blt/pages/setting.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import '../helpers/page_test_env.dart';
 
 void main() {
   setupPageTestEnv();
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('设置首尾方向键展示无焦点的标题和底部留白 $size', (tester) async {
+      await pumpPage(tester, const SettingPage(), size: size);
+      await flush(tester);
+      final controller = tester
+          .widget<ListView>(find.byType(ListView))
+          .controller!;
+      Future<void> focusTile(String title) async {
+        await tester.ensureVisible(find.text(title));
+        final focus = find
+            .ancestor(of: find.text(title), matching: find.byType(Focus))
+            .first;
+        tester.widget<Focus>(focus).focusNode!.requestFocus();
+        await tester.pumpAndSettle();
+      }
+
+      await focusTile('进入视频默认画质');
+      controller.jumpTo(60 * size.height / 1080);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(controller.offset, controller.position.minScrollExtent);
+      expect(tester.getTopLeft(find.text('偏好设置')).dy, greaterThanOrEqualTo(0));
+      await focusTile('弹幕屏蔽权重');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(controller.offset, controller.position.maxScrollExtent);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('默认画质与解码设置在720p/1080p/4K布局正常并能保存', (tester) async {
     for (final size in [
       const Size(1280, 720),

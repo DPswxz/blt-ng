@@ -19,6 +19,9 @@ Future<T?>? openPlaybackPage<T>(
   }
   return Get.to<T>(
     buildPage,
+    // Native detail routes can leave GetX tracking the same generic /Widget
+    // name. The caller already guards repeated activation while playing.
+    preventDuplicates: false,
     opaque: true,
     transition: Transition.noTransition,
     duration: Duration.zero,

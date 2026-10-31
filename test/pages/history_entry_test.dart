@@ -4,6 +4,9 @@ import 'package:blt/pages/history.dart';
 import 'package:blt/pages/season_detail.dart';
 import 'package:blt/pages/video_detail.dart';
 import 'package:blt/storages/season_history.dart';
+import 'package:blt/storages/auth.dart';
+import 'package:blt/widgets/video_grid_view.dart';
+import 'package:get/get.dart' hide Response;
 import 'package:blt/widgets/video_actions.dart';
 import 'package:blt/widgets/video_comments.dart';
 import 'package:dio/dio.dart';
@@ -86,6 +89,60 @@ void main() {
       }),
     );
   }
+
+  testWidgets('从历史详情返回后重新请求第一页', (t) async {
+    mockEpisode();
+    loginInfoNotifier.value = const LoginInfo(isLogin: true, mid: 1);
+    var requests = 0;
+    final interceptor = InterceptorsWrapper(
+      onRequest: (options, handler) {
+        if (options.path.endsWith('/history/cursor')) {
+          requests++;
+          expect(options.queryParameters.containsKey('max'), isFalse);
+          handler.resolve(
+            Response(
+              requestOptions: options,
+              statusCode: 200,
+              data: {
+                'code': 0,
+                'data': {
+                  'cursor': {'max': 0},
+                  'list': [],
+                },
+              },
+            ),
+          );
+        } else {
+          handler.next(options);
+        }
+      },
+    );
+    bilibiliHttpClient.interceptors.add(interceptor);
+    addTearDown(() {
+      bilibiliHttpClient.interceptors.remove(interceptor);
+      Get.reset();
+    });
+    final refresh = ValueNotifier(0);
+    await pumpPage(t, GetMaterialApp(home: HistoryPage(refresh)));
+    for (var i = 0; i < 4; i++) {
+      await flush(t);
+    }
+    expect(requests, 1);
+    t.widget<VideoGridView>(find.byType(VideoGridView)).onItemTap!(
+      0,
+      MediaCardInfo.fromHistoryJson(historyRow())!,
+    );
+    for (var i = 0; i < 6; i++) {
+      await flush(t);
+    }
+    Get.back();
+    for (var i = 0; i < 6; i++) {
+      await flush(t);
+    }
+    expect(requests, 2);
+    await t.pumpWidget(const SizedBox());
+    refresh.dispose();
+  });
 
   test('历史保留PGC分集与系列标识，普通稿件仍进入普通详情，非视频过滤', () {
     final item = MediaCardInfo.fromHistoryJson(historyRow())!;

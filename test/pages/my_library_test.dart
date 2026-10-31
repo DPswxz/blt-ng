@@ -154,7 +154,10 @@ void main() {
     await t.tap(find.text('收藏夹A'));
     await flush(t);
     expect(find.text('收藏视频A'), findsOneWidget);
-    expect(find.text('返回'), findsOneWidget);
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    expect(find.text('收藏夹A'), findsOneWidget);
+    expect(find.text('收藏视频A'), findsNothing);
     expect(t.takeException(), isNull);
   });
 }

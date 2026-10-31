@@ -166,7 +166,8 @@ class RecommendPage extends StatefulWidget {
 
 class _RecommendPageState extends State<RecommendPage> {
   int _section = 0;
-  final _refresh = List.generate(3, (_) => ValueNotifier(0));
+  static const _sections = ['推荐', '热门', '番剧', '电影'];
+  final _refresh = List.generate(_sections.length, (_) => ValueNotifier(0));
   @override
   void initState() {
     super.initState();
@@ -192,7 +193,7 @@ class _RecommendPageState extends State<RecommendPage> {
           padding: EdgeInsets.fromLTRB(24 * ui, 14 * ui, 24 * ui, 4 * ui),
           child: Row(
             children: [
-              for (var i = 0; i < 3; i++)
+              for (var i = 0; i < _sections.length; i++)
                 Padding(
                   padding: EdgeInsets.only(right: 16 * ui),
                   child: GestureDetector(
@@ -211,7 +212,7 @@ class _RecommendPageState extends State<RecommendPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              ['推荐', '热门', '番剧'][i],
+                              _sections[i],
                               style: TextStyle(
                                 fontSize: 30 * ui,
                                 fontWeight: _section == i
@@ -250,6 +251,7 @@ class _RecommendPageState extends State<RecommendPage> {
               _HomeVideoFeed(_refresh[0]),
               _HomeVideoFeed(_refresh[1], popular: true),
               _BangumiHome(refresh: _refresh[2]),
+              _BangumiHome(refresh: _refresh[3], seasonType: 2, title: '电影'),
             ],
           ),
         ),
@@ -260,7 +262,13 @@ class _RecommendPageState extends State<RecommendPage> {
 
 class _BangumiHome extends StatefulWidget {
   final ValueNotifier<int> refresh;
-  const _BangumiHome({required this.refresh});
+  final int seasonType;
+  final String title;
+  const _BangumiHome({
+    required this.refresh,
+    this.seasonType = 1,
+    this.title = '番剧',
+  });
   @override
   State<_BangumiHome> createState() => _BangumiHomeState();
 }
@@ -282,10 +290,11 @@ class _BangumiHomeState extends State<_BangumiHome> {
 
   @override
   Widget build(BuildContext context) => LibraryCollectionPane(
-    key: ValueKey('catalog-$_revision'),
-    title: '番剧',
+    key: ValueKey('catalog-${widget.seasonType}-$_revision'),
+    title: widget.title,
     showHeader: false,
-    loader: (page) => listBangumiCatalog(page: page),
+    loader: (page) =>
+        listBangumiCatalog(page: page, seasonType: widget.seasonType),
     onOpen: (season) => openSeasonDetail(context, season),
   );
 }

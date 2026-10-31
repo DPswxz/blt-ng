@@ -45,14 +45,17 @@ String seasonAccessBadge(Map<String, dynamic> data) {
   return text;
 }
 
-Future<LibraryBatch> listBangumiCatalog({int page = 1}) async {
+Future<LibraryBatch> listBangumiCatalog({
+  int page = 1,
+  int seasonType = 1,
+}) async {
   final data =
       jsonMap(
         await bilibiliRequest(
           'GET',
           'https://api.bilibili.com/pgc/season/index/result',
           queries: {
-            'season_type': 1,
+            'season_type': seasonType,
             'type': 1,
             'page': page,
             'pagesize': 20,

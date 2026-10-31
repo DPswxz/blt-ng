@@ -4,6 +4,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 void main() {
+  testWidgets('番剧原生详情路由可进入播放器并重复播放', (tester) async {
+    addTearDown(() => Get.reset());
+    await tester.pumpWidget(
+      const GetMaterialApp(home: Scaffold(body: Text('首页'))),
+    );
+    final navigator = Navigator.of(tester.element(find.text('首页')));
+    navigator.push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/Widget'),
+        builder: (_) => const Scaffold(body: Text('番剧详情')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 2; i++) {
+      openPlaybackPage(() => const Scaffold(body: Text('播放中')));
+      await tester.pumpAndSettle();
+      expect(find.text('播放中'), findsOneWidget);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('番剧详情'), findsOneWidget);
+    }
+  });
   for (final size in const [
     Size(1280, 720),
     Size(1920, 1080),
