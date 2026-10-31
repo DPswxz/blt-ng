@@ -1,3 +1,4 @@
+import 'package:blt/widgets/playback_mode_icon.dart';
 import 'package:blt/storages/season_history.dart';
 import 'package:blt/utils/playback_completion.dart';
 import 'package:blt/widgets/playback_completed.dart';
@@ -760,9 +761,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (videoUrls.isEmpty) {
       throw Exception('该画质无可用视频流');
     }
-    final audioTracks = [...media.audio]
-      ..sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
-    _currentAudio = audioTracks.isEmpty ? null : audioTracks.first;
+    final preferredAudio =
+        await Settings.getInt(Settings.pathPreferredAudio) ?? 0;
+    if (!mounted) return;
+    _currentAudio = preferredAudioTrack(media.audio, preferredAudio);
     var audioUrls =
         (_currentAudio == null ? <DashMediaData>[] : [_currentAudio!])
             .expand((e) => [e.baseUrl, ...e.backupUrls])
@@ -904,6 +906,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     try {
       await _controller.player.setAudioTrack(AudioTrack.uri(selected.baseUrl));
       _audioUrls = [selected.baseUrl, ...selected.backupUrls];
+      await Settings.setInt(Settings.pathPreferredAudio, selected.quality);
+      if (!mounted) return;
       setState(() => _currentAudio = selected);
     } catch (_) {
       if (mounted) pushTooltipError(context, '音轨切换失败，保留原音轨');
@@ -1070,6 +1074,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       options: PlayerLoopMode.values,
       current: _loopMode.value,
       labelOf: (mode) => mode.description,
+      iconOf: playbackModeIcon,
     );
     if (!mounted || selected == null) return;
     _loopMode.value = selected;
@@ -1267,7 +1272,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ),
       PlayerBarAction(
         kind: PlayerControlKind.loop,
-        icon: Icons.loop_rounded,
+        icon: playbackModeIcon(_loopMode.value),
         label: '播放完后',
         value: _loopMode.value.description,
         onSelect: _onLoopTapped,
@@ -1282,31 +1287,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   List<PlayerPanelRow> _buildPanelRows() {
-    final ready = _videoReady.value;
     return [
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.quality,
-        icon: Icons.high_quality_outlined,
-        label: '画质·清晰度',
-        value: ready ? _qualityLabel(_currentQuality.value) : '--',
-        enabled: ready,
-        onSelect: _onQualityTapped,
-      ),
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.aspect,
-        icon: Icons.aspect_ratio_rounded,
-        label: '画面比例',
-        value: _aspectMode.value.description,
-        onSelect: _onAspectTapped,
-      ),
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.loop,
-        icon: Icons.loop_rounded,
-        label: '播放完后',
-        value: _loopMode.value.description,
-        onSelect: _onLoopTapped,
-      ),
-      const PlayerPanelRow.divider(),
       PlayerPanelRow.item(
         kind: PlayerControlKind.defaultQuality,
         icon: Icons.high_quality,

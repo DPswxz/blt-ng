@@ -873,6 +873,7 @@ Future<T?> showPlayerPicker<T>({
   required List<T> options,
   required T current,
   required String Function(T value) labelOf,
+  IconData Function(T value)? iconOf,
 }) {
   final ui = context.ui;
   return showModalBottomSheet<T>(
@@ -889,6 +890,7 @@ Future<T?> showPlayerPicker<T>({
       options: options,
       current: current,
       labelOf: labelOf,
+      iconOf: iconOf,
     ),
   );
 }
@@ -898,12 +900,14 @@ class _PlayerPickerSheet<T> extends StatelessWidget {
   final List<T> options;
   final T current;
   final String Function(T value) labelOf;
+  final IconData Function(T value)? iconOf;
 
   const _PlayerPickerSheet({
     required this.title,
     required this.options,
     required this.current,
     required this.labelOf,
+    this.iconOf,
   });
 
   @override
@@ -956,6 +960,16 @@ class _PlayerPickerSheet<T> extends StatelessWidget {
                             ),
                             child: Row(
                               children: [
+                                if (iconOf != null) ...[
+                                  Icon(
+                                    iconOf!(item),
+                                    size: 30 * ui,
+                                    color: item == current
+                                        ? biliPink
+                                        : Colors.white,
+                                  ),
+                                  SizedBox(width: 16 * ui),
+                                ],
                                 Expanded(
                                   child: Text(
                                     labelOf(item),

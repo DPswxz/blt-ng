@@ -1,3 +1,4 @@
+import 'package:blt/consts/danmaku.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:blt/utils/playback_policy.dart';
 import 'package:blt/utils/ui_scale.dart';
@@ -15,6 +16,12 @@ class SettingPage extends StatefulWidget {
 
 class _SettingPageState extends State<SettingPage> {
   int _quality = 80, _codec = 0;
+  int _audio = 0;
+  bool _danmakuEnabled = true;
+  int _fontSize = defaultDanmakuFontSize;
+  int _area = defaultDanmakuArea;
+  int _transparency = defaultDanmakuTransparency;
+  int _weight = 6;
   String _decoder = 'auto';
   @override
   void initState() {
@@ -38,6 +45,28 @@ class _SettingPageState extends State<SettingPage> {
     _quality = await Settings.getInt(Settings.pathDefaultQuality) ?? 80;
     _codec = await Settings.getInt(Settings.pathPreferredCodec) ?? 0;
     _decoder = await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
+    _audio = await Settings.getInt(Settings.pathPreferredAudio) ?? 0;
+    _danmakuEnabled = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
+    _fontSize =
+        await Settings.getInt(Settings.pathDanmuFontSize) ??
+        defaultDanmakuFontSize;
+    _area = await Settings.getInt(Settings.pathDanmuArea) ?? defaultDanmakuArea;
+    _transparency =
+        (await Settings.getInt(Settings.pathDanmuTransparency) ??
+                defaultDanmakuTransparency)
+            .clamp(0, 90);
+    _weight = await Settings.getInt(Settings.pathDanmuBlockWeightSwitch) ?? 6;
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) {
+    final ui = context.ui;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(8 * ui, 8 * ui, 8 * ui, 16 * ui),
+      child: Text(
+        title,
+        style: TextStyle(fontSize: 28 * ui, fontWeight: FontWeight.w700),
+      ),
+    );
   }
 
   @override
@@ -63,6 +92,7 @@ class _SettingPageState extends State<SettingPage> {
                 ),
               ),
             ),
+            _sectionTitle(context, '播放设置'),
             CustomSettingsPanel(
               children: [
                 CustomSettingsDropdownTile<String>(
@@ -104,6 +134,87 @@ class _SettingPageState extends State<SettingPage> {
                         .firstWhere((e) => e.value == v)
                         .key;
                     Settings.setInt(Settings.pathPreferredCodec, _codec);
+                  }),
+                ),
+                CustomSettingsDropdownTile<String>(
+                  leading: const Icon(Icons.audiotrack),
+                  title: '音轨设置',
+                  subtitle: '优先使用所选音轨，片源不支持时使用最高码率音轨。',
+                  value:
+                      preferredAudioLabels[_audio] ?? preferredAudioLabels[0]!,
+                  items: preferredAudioLabels.values.toList(),
+                  onChanged: (value) => setState(() {
+                    _audio = preferredAudioLabels.entries
+                        .firstWhere((e) => e.value == value)
+                        .key;
+                    Settings.setInt(Settings.pathPreferredAudio, _audio);
+                  }),
+                ),
+              ],
+            ),
+            SizedBox(height: 24 * ui),
+            _sectionTitle(context, '弹幕设置'),
+            CustomSettingsPanel(
+              children: [
+                CustomSettingsSwitchTile(
+                  leading: const Icon(Icons.subtitles_outlined),
+                  title: '开启弹幕',
+                  value: _danmakuEnabled,
+                  onChanged: (value) => setState(() {
+                    _danmakuEnabled = value;
+                    Settings.setBool(Settings.pathDanmuSwitch, value);
+                  }),
+                ),
+                CustomSettingsDropdownTile<int>(
+                  leading: const Icon(Icons.format_size),
+                  title: '弹幕字体大小',
+                  value: _fontSize,
+                  items: danmakuFontSizes,
+                  onChanged: (value) => setState(() {
+                    _fontSize = value;
+                    Settings.setInt(Settings.pathDanmuFontSize, value);
+                  }),
+                ),
+                CustomSettingsDropdownTile<String>(
+                  leading: const Icon(Icons.vertical_align_top),
+                  title: '显示区域',
+                  value:
+                      danmakuAreaLabels[_area] ??
+                      danmakuAreaLabels[defaultDanmakuArea]!,
+                  items: danmakuAreaLabels.values.toList(),
+                  onChanged: (value) => setState(() {
+                    _area = danmakuAreaLabels.entries
+                        .firstWhere((e) => e.value == value)
+                        .key;
+                    Settings.setInt(Settings.pathDanmuArea, _area);
+                  }),
+                ),
+                CustomSettingsDropdownTile<String>(
+                  leading: const Icon(Icons.opacity),
+                  title: '透明度',
+                  value: danmakuTransparencyLabel(_transparency),
+                  items: danmakuTransparencies
+                      .map(danmakuTransparencyLabel)
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _transparency = danmakuTransparencies.firstWhere(
+                      (v) => danmakuTransparencyLabel(v) == value,
+                    );
+                    Settings.setInt(
+                      Settings.pathDanmuTransparency,
+                      _transparency,
+                    );
+                  }),
+                ),
+                CustomSettingsDropdownTile<int>(
+                  leading: const Icon(Icons.filter_alt_outlined),
+                  title: '弹幕屏蔽权重',
+                  subtitle: '权重越大，显示的弹幕越少。',
+                  value: _weight,
+                  items: List.generate(11, (i) => i),
+                  onChanged: (value) => setState(() {
+                    _weight = value;
+                    Settings.setInt(Settings.pathDanmuBlockWeightSwitch, value);
                   }),
                 ),
               ],

@@ -1,3 +1,8 @@
+import 'dart:collection';
+import 'package:flutter/scheduler.dart';
+import 'package:blt/utils/danmaku_timeline.dart';
+import 'package:blt/consts/danmaku.dart';
+export 'package:blt/consts/danmaku.dart';
 import 'package:blt/utils/request_scope.dart';
 import 'dart:async';
 
@@ -8,15 +13,6 @@ import 'package:blt/storages/settings.dart';
 import 'package:blt/utils/ui_scale.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:flutter/material.dart';
-
-const danmakuAreaLabels = {
-  5: '顶部 5%',
-  10: '顶部 10%',
-  25: '顶部 25%',
-  50: '顶部 50%',
-};
-String danmakuTransparencyLabel(int value) =>
-    value == 0 ? '0%（不透明）' : '$value%';
 
 class BilibiliDanmakuWallController {
   // 弹幕墙就绪前为空，此时所有操作均为空操作
@@ -82,11 +78,39 @@ class BilibiliDanmakuWall extends StatefulWidget {
 class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   final _requests = RequestScope();
   int _danmuBlockWeight = 6;
-  double _danmuFontSize = 20;
-  int _danmuArea = 10;
-  int _transparency = 0;
+  double _danmuFontSize = defaultDanmakuFontSize.toDouble();
+  int _danmuArea = defaultDanmakuArea;
+  int _transparency = defaultDanmakuTransparency;
   bool _initDone = false;
   bool _pullDanmaku = false;
+  DanmakuTimeline<DanmakuElem>? _timeline;
+  final _pending = Queue<DanmakuElem>();
+  int? _frameCallback;
+  bool _playing = true;
+
+  void _clearPending() {
+    if (_frameCallback != null) {
+      SchedulerBinding.instance.cancelFrameCallbackWithId(_frameCallback!);
+    }
+    _frameCallback = null;
+    _pending.clear();
+  }
+
+  void _schedulePending() {
+    if (_frameCallback != null ||
+        _pending.isEmpty ||
+        !_playing ||
+        !widget.controller.enabled) {
+      return;
+    }
+    _frameCallback = SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _frameCallback = null;
+      if (!mounted || !_playing || !widget.controller.enabled) return;
+      if (_pending.isNotEmpty) _onPushDanmaku([_pending.removeFirst()]);
+      _schedulePending();
+    });
+  }
+
   DateTime? _lastPullFailTime;
   (int, int, DmSegMobileReply)? _danmakuCache; // (cid, 分块index, 弹幕数据)
 
@@ -111,6 +135,8 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
     if (oldWidget.cid != widget.cid) {
       // 切分P：丢弃旧分P缓存与时间轴进度，避免旧弹幕串台
       _danmakuCache = null;
+      _timeline = null;
+      _clearPending();
       _lastPushDanmakuTime = null;
       _pullDanmaku = false;
       _onClear();
@@ -136,6 +162,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   @override
   void dispose() {
+    _clearPending();
     _requests.dispose();
     widget.controller._reloadFunc = null;
     _timelineSubscription?.cancel();
@@ -152,7 +179,8 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
       final fontSize = await Settings.getInt(Settings.pathDanmuFontSize);
       final area = await Settings.getInt(Settings.pathDanmuArea) ?? 10;
       final transparency =
-          await Settings.getInt(Settings.pathDanmuTransparency) ?? 0;
+          await Settings.getInt(Settings.pathDanmuTransparency) ??
+          defaultDanmakuTransparency;
       if (!mounted) return;
       final newArea = danmakuAreaLabels.containsKey(area) ? area : 10;
       if (_danmuArea != newArea) widget.controller.clearDanmaku();
@@ -160,7 +188,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
         _danmuArea = newArea;
         _transparency = transparency.clamp(0, 90);
         _danmuBlockWeight = weight ?? 6;
-        _danmuFontSize = (fontSize ?? 20).toDouble();
+        _danmuFontSize = (fontSize ?? defaultDanmakuFontSize).toDouble();
         _initDone = true;
       });
       widget.controller._controller?.updateOption(_option(context.ui));
@@ -202,13 +230,22 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
         ? pos.inMilliseconds
         : _lastPushDanmakuTime!.inMilliseconds;
     _lastPushDanmakuTime = pos;
-    final needPushDanmakuList = _danmakuCache!.$3.elems.where((e) {
-      // 屏蔽权重
-      if (e.weight <= _danmuBlockWeight) return false;
-      return lastPushMS <= e.progress && e.progress < pos.inMilliseconds;
-    }).toList();
-    if (needPushDanmakuList.isEmpty) return;
-    _onPushDanmaku(needPushDanmakuList);
+    // Do not replay a seek or a stalled decoder's entire backlog in one frame.
+    if (pos.inMilliseconds - lastPushMS > 2000 ||
+        pos.inMilliseconds < lastPushMS) {
+      _clearPending();
+      return;
+    }
+    for (final item
+        in _timeline?.between(lastPushMS, pos.inMilliseconds) ??
+            <DanmakuElem>[]) {
+      if (item.weight <= _danmuBlockWeight || item.content.length > 180) {
+        continue;
+      }
+      if (_pending.length >= 24) _pending.removeFirst();
+      _pending.add(item);
+    }
+    _schedulePending();
   }
 
   // 拉取弹幕
@@ -225,6 +262,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
       );
       if (!mounted || widget.cid != cid) return;
       _danmakuCache = (cid, index, danmakuResp);
+      _timeline = DanmakuTimeline(danmakuResp.elems, (item) => item.progress);
     } catch (_) {
       // 拉取失败时保留旧缓存并进入冷却，等待后续重试
       _lastPullFailTime = DateTime.now();
@@ -281,6 +319,8 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   // 播放状态变化
   void _onPlayingChanged(bool playing) {
+    _playing = playing;
+    if (playing) _schedulePending();
     if (playing) {
       widget.controller.resume();
     } else {
@@ -292,6 +332,8 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   void _onEnableChanged() {
     final enable = widget.controller.enableNotifier.value;
     if (!enable) {
+      _clearPending();
+      _timeline = null;
       _onClear();
       _danmakuCache = null;
       widget.controller._controller = null;
@@ -303,6 +345,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   }
 
   void _onClear() {
+    _clearPending();
     widget.controller.clearDanmaku();
     _lastPushDanmakuTime = null;
   }
@@ -316,6 +359,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   DanmakuOption _option(double ui) => DanmakuOption(
     fontSize: _danmuFontSize * ui,
     opacity: 1 - _transparency / 100,
+    safeArea: false,
   );
 
   @override

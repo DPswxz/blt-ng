@@ -5,6 +5,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('优先音轨缺失时回退最高码率，不修改原始列表', () {
+    const tracks = [
+      DashMediaData(
+        quality: 30216,
+        codecId: 0,
+        bandwidth: 64000,
+        baseUrl: 'low',
+        backupUrls: [],
+      ),
+      DashMediaData(
+        quality: 30280,
+        codecId: 0,
+        bandwidth: 192000,
+        baseUrl: 'high',
+        backupUrls: [],
+      ),
+    ];
+    expect(preferredAudioTrack(tracks, 30216)?.baseUrl, 'low');
+    expect(preferredAudioTrack(tracks, 30232)?.baseUrl, 'high');
+    expect(preferredAudioTrack(tracks, 0)?.baseUrl, 'high');
+    expect(preferredAudioTrack([], 0), isNull);
+    expect(tracks.first.baseUrl, 'low');
+  });
   test('4K is requested without enabling HDR, Dolby or AV1', () {
     expect(webPlayParameters['fourk'], 1);
     expect(webPlayParameters['fnval'], 144);

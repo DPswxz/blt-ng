@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.23+2047
+version: 1.0.24+2048
 
 environment:
   sdk: ^3.9.2
@@ -53,7 +53,8 @@ dependencies:
   flutterx_live_data: ^1.10.3
   protobuf: ^5.1.0 # pb
   fixnum: ^1.1.1 # pb
-  canvas_danmaku: ^0.2.7 # 弹幕绘制
+  canvas_danmaku:
+    path: third_party/canvas_danmaku # 本地绘制性能修复
   flutter_displaymode: ^0.7.0 # 高刷
   get: ^4.7.2 # 路由
   logger: ^2.6.2 # 日志

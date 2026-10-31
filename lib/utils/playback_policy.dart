@@ -75,3 +75,17 @@ List<Quality> defaultQualityOrder(List<Quality> qualities, int maximum) {
       .where((q) => levels.indexOf(q.id) >= (cap < 0 ? 0 : cap))
       .toList();
 }
+
+const preferredAudioLabels = {
+  0: '自动（最高码率）',
+  30280: 'AAC · 192K',
+  30232: 'AAC · 132K',
+  30216: 'AAC · 64K',
+};
+DashMediaData? preferredAudioTrack(List<DashMediaData> tracks, int preferred) {
+  if (tracks.isEmpty) return null;
+  final sorted = [...tracks]
+    ..sort((a, b) => b.bandwidth.compareTo(a.bandwidth));
+  return sorted.where((track) => track.quality == preferred).firstOrNull ??
+      sorted.first;
+}

@@ -11,7 +11,8 @@ Future<void> showDanmakuSettings(
 }) async {
   final area = await Settings.getInt(Settings.pathDanmuArea) ?? 10;
   final transparency =
-      await Settings.getInt(Settings.pathDanmuTransparency) ?? 0;
+      await Settings.getInt(Settings.pathDanmuTransparency) ??
+      defaultDanmakuTransparency;
   if (!context.mounted) return;
   final action = await showPlayerPicker<int>(
     context: context,
@@ -40,10 +41,10 @@ Future<void> showDanmakuSettings(
   final value =
       await Settings.getInt(key) ??
       switch (action) {
-        1 => 20,
+        1 => defaultDanmakuFontSize,
         2 => 6,
         3 => 10,
-        _ => 0,
+        _ => defaultDanmakuTransparency,
       };
   if (!context.mounted) return;
   final title = switch (action) {
@@ -56,10 +57,10 @@ Future<void> showDanmakuSettings(
     context: context,
     title: title,
     options: switch (action) {
-      1 => const [16, 18, 20, 22, 25, 28, 30, 36],
+      1 => danmakuFontSizes,
       2 => List.generate(11, (i) => i),
       3 => danmakuAreaLabels.keys.toList(),
-      _ => const [0, 20, 40, 60, 80, 90],
+      _ => danmakuTransparencies,
     },
     current: value,
     labelOf: (v) => action == 3

@@ -1,3 +1,6 @@
+import 'package:blt/widgets/custom_setting_tiles.dart';
+import 'package:blt/widgets/bilibili_danmaku_wall.dart';
+import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:blt/pages/setting.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +19,8 @@ void main() {
       await flush(tester);
       expect(find.text('进入视频默认画质'), findsOneWidget);
       expect(find.text('解码方式'), findsOneWidget);
-      expect(find.text('弹幕字体大小'), findsNothing);
+      expect(find.text('音轨设置'), findsOneWidget);
+      expect(find.text('播放设置'), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
     await tester.tap(find.text('进入视频默认画质'));
@@ -28,7 +32,7 @@ void main() {
   testWidgets('默认画质包含4K，说明位于该项下面，没有第四项说明', (tester) async {
     await pumpPage(tester, const SettingPage());
     await flush(tester);
-    expect(find.text('播放设置'), findsNothing);
+    expect(find.text('播放设置'), findsOneWidget);
     expect(find.textContaining('每个视频按默认画质进入'), findsOneWidget);
     await tester.tap(find.text('进入视频默认画质'));
     await tester.pumpAndSettle();
@@ -41,4 +45,67 @@ void main() {
     await tester.pumpAndSettle();
     expect(await Settings.getInt(Settings.pathDefaultQuality), 112);
   });
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('分组设置保存弹幕并在真实画布生效 $size', (tester) async {
+      await pumpPage(tester, const SettingPage(), size: size);
+      await flush(tester);
+      await tester.ensureVisible(find.text('音轨设置'));
+      await tester.tap(find.text('音轨设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('AAC · 132K'));
+      await tester.pumpAndSettle();
+      expect(await Settings.getInt(Settings.pathPreferredAudio), 30232);
+      await tester.ensureVisible(find.text('开启弹幕'));
+      final toggle = tester.widget<CustomSettingsSwitchTile>(
+        find.byType(CustomSettingsSwitchTile),
+      );
+      expect(toggle.value, isTrue);
+      await tester.tap(find.text('开启弹幕'));
+      await tester.pumpAndSettle();
+      expect(await Settings.getBool(Settings.pathDanmuSwitch), isFalse);
+      await tester.tap(find.text('开启弹幕'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('弹幕字体大小'));
+      await tester.tap(find.text('弹幕字体大小'));
+      await tester.pumpAndSettle();
+      for (final label in ['16', '18', '20', '22']) {
+        expect(find.text(label), findsNothing);
+      }
+      for (final label in ['25', '28', '30', '36', '40', '48', '56']) {
+        expect(find.text(label), findsWidgets);
+      }
+      await tester.tap(find.text('48'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('透明度'));
+      await tester.tap(find.text('透明度'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('60%'));
+      await tester.pumpAndSettle();
+      final controller = BilibiliDanmakuWallController(
+        await Settings.getBool(Settings.pathDanmuSwitch) ?? true,
+      );
+      await pumpPage(
+        tester,
+        BilibiliDanmakuWall(
+          controller: controller,
+          cid: 1,
+          timeline: const Stream<Duration>.empty(),
+          playing: const Stream<bool>.empty(),
+        ),
+        size: size,
+      );
+      await flush(tester);
+      final screen = tester.widget<DanmakuScreen>(find.byType(DanmakuScreen));
+      expect(screen.option.fontSize, closeTo(48 * size.height / 1080, 0.001));
+      expect(screen.option.opacity, 0.4);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 200));
+      controller.dispose();
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

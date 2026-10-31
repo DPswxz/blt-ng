@@ -7,6 +7,31 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   setupPageTestEnv();
+  testWidgets('初始弹幕字号30、透明度40、顶部10%', (t) async {
+    final controller = BilibiliDanmakuWallController(true);
+    await pumpPage(
+      t,
+      BilibiliDanmakuWall(
+        controller: controller,
+        cid: 1,
+        timeline: const Stream<Duration>.empty(),
+        playing: const Stream<bool>.empty(),
+      ),
+    );
+    await flush(t);
+    final option = t.widget<DanmakuScreen>(find.byType(DanmakuScreen)).option;
+    expect(option.fontSize, 30);
+    expect(option.opacity, 0.6);
+    expect(
+      t
+          .widget<FractionallySizedBox>(find.byType(FractionallySizedBox))
+          .heightFactor,
+      0.1,
+    );
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(milliseconds: 200));
+    controller.dispose();
+  });
   testWidgets('关闭弹幕卸载画布并停止动画，再开启时重建可用画布', (t) async {
     final controller = BilibiliDanmakuWallController(false);
     await pumpPage(
