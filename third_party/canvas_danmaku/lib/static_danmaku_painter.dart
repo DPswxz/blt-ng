@@ -10,6 +10,7 @@ class StaticDanmakuPainter extends CustomPainter {
   final double fontSize;
   final int fontWeight;
   final bool showStroke;
+  final double opacity;
   final double danmakuHeight;
   final bool running;
   final int tick;
@@ -28,21 +29,25 @@ class StaticDanmakuPainter extends CustomPainter {
       this.showStroke,
       this.danmakuHeight,
       this.running,
-      this.tick);
+      this.tick,
+      {this.opacity = 1});
 
   @override
   void paint(Canvas canvas, Size size) {
+    selfSendPaint.color = Colors.green.withValues(alpha: opacity);
     // 绘制顶部弹幕
     for (var item in topDanmakuItems) {
       item.xPosition = (size.width - item.width) / 2;
       // 如果 Paragraph 没有缓存，则创建并缓存它
       item.paragraph ??= Utils.generateParagraph(
-          item.content, size.width, fontSize, fontWeight);
+          item.content, size.width, fontSize, fontWeight,
+          opacity: opacity);
 
       // 黑色部分
       if (showStroke) {
         item.strokeParagraph ??= Utils.generateStrokeParagraph(
-            item.content, size.width, fontSize, fontWeight);
+            item.content, size.width, fontSize, fontWeight,
+            opacity: opacity);
 
         canvas.drawParagraph(
             item.strokeParagraph!, Offset(item.xPosition, item.yPosition));
@@ -63,12 +68,14 @@ class StaticDanmakuPainter extends CustomPainter {
       item.xPosition = (size.width - item.width) / 2;
       // 如果 Paragraph 没有缓存，则创建并缓存它
       item.paragraph ??= Utils.generateParagraph(
-          item.content, size.width, fontSize, fontWeight);
+          item.content, size.width, fontSize, fontWeight,
+          opacity: opacity);
 
       // 黑色部分
       if (showStroke) {
         item.strokeParagraph ??= Utils.generateStrokeParagraph(
-            item.content, size.width, fontSize, fontWeight);
+            item.content, size.width, fontSize, fontWeight,
+            opacity: opacity);
 
         canvas.drawParagraph(
             item.strokeParagraph!,

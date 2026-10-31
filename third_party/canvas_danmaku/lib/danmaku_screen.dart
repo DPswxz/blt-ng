@@ -182,27 +182,33 @@ class _DanmakuScreenState extends State<DanmakuScreen>
         return;
       }
     } else {
-      // 在这里提前创建 Paragraph 缓存防止卡顿
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: content.text,
-          style: TextStyle(
-            fontSize: _option.fontSize,
-            fontWeight: FontWeight.values[_option.fontWeight],
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      final danmakuWidth = textPainter.width;
-      final danmakuHeight = textPainter.height;
-      textPainter.dispose();
-
+      if (_trackYPositions.isEmpty ||
+          (content.type == DanmakuItemType.scroll && _option.hideScroll) ||
+          (content.type == DanmakuItemType.top && _option.hideTop) ||
+          (content.type == DanmakuItemType.bottom && _option.hideBottom)) {
+        return;
+      }
+      // Shape the fill once and reuse its metrics instead of laying out the
+      // same text first through TextPainter and then through ParagraphBuilder.
       final ui.Paragraph paragraph = Utils.generateParagraph(
-        content,
-        danmakuWidth,
-        _option.fontSize,
-        _option.fontWeight,
-      );
+          content, double.infinity, _option.fontSize, _option.fontWeight,
+          opacity: _option.opacity);
+      final danmakuWidth = paragraph.longestLine.ceilToDouble();
+      final danmakuHeight = paragraph.height;
+      paragraph.layout(ui.ParagraphConstraints(width: danmakuWidth));
+      final canFit = switch (content.type) {
+        DanmakuItemType.scroll =>
+          _trackYPositions.any((y) => _scrollCanAddToTrack(y, danmakuWidth)) ||
+              _option.massiveMode ||
+              content.selfSend,
+        DanmakuItemType.top => _trackYPositions.any(_topCanAddToTrack),
+        DanmakuItemType.bottom => _trackYPositions.any(_bottomCanAddToTrack),
+        _ => false,
+      };
+      if (!canFit) {
+        paragraph.dispose();
+        return;
+      }
 
       ui.Paragraph? strokeParagraph;
       if (_option.showStroke) {
@@ -211,6 +217,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
           danmakuWidth,
           _option.fontSize,
           _option.fontWeight,
+          opacity: _option.opacity,
         );
       }
 
@@ -380,7 +387,9 @@ class _DanmakuScreenState extends State<DanmakuScreen>
       needRestart = true;
     }
 
-    if (option.fontSize != _option.fontSize) {
+    if (option.fontSize != _option.fontSize ||
+        option.fontWeight != _option.fontWeight ||
+        option.opacity != _option.opacity) {
       needClearParagraph = true;
     }
 
@@ -393,6 +402,10 @@ class _DanmakuScreenState extends State<DanmakuScreen>
     }
     if (option.hideBottom && !_option.hideBottom) {
       _bottomDanmakuItems.clear();
+    }
+    if (option.duration != _option.duration) {
+      clearDanmakus();
+      _animationController.duration = Duration(seconds: option.duration);
     }
     _option = option;
     _controller.option = _option;
@@ -556,67 +569,68 @@ class _DanmakuScreenState extends State<DanmakuScreen>
         }
         return ClipRect(
           child: IgnorePointer(
-            child: Opacity(
-              opacity: _option.opacity,
-              child: Stack(
-                children: [
-                  RepaintBoundary(
-                    child: CustomPaint(
-                      painter: ScrollDanmakuPainter(
-                        items: _scrollDanmakuItems,
-                        durationSeconds: _option.duration,
-                        fontSize: _option.fontSize,
-                        fontWeight: _option.fontWeight,
-                        showStroke: _option.showStroke,
-                        tick: () => _paintTick,
-                        repaint: _animationController,
-                      ),
-                      child: const SizedBox.expand(),
+            child: Stack(
+              children: [
+                RepaintBoundary(
+                  child: CustomPaint(
+                    painter: ScrollDanmakuPainter(
+                      items: _scrollDanmakuItems,
+                      durationSeconds: _option.duration,
+                      fontSize: _option.fontSize,
+                      fontWeight: _option.fontWeight,
+                      showStroke: _option.showStroke,
+                      opacity: _option.opacity,
+                      tick: () => _paintTick,
+                      repaint: _animationController,
                     ),
+                    child: const SizedBox.expand(),
                   ),
-                  RepaintBoundary(
-                    child: AnimatedBuilder(
-                      animation: _staticAnimationController,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          painter: StaticDanmakuPainter(
-                            _staticAnimationController.value,
-                            _topDanmakuItems,
-                            _bottomDanmakuItems,
-                            _option.duration,
-                            _option.fontSize,
-                            _option.fontWeight,
-                            _option.showStroke,
-                            _danmakuHeight,
-                            _running,
-                            _tick,
-                          ),
-                          child: Container(),
-                        );
-                      },
-                    ),
+                ),
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _staticAnimationController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: StaticDanmakuPainter(
+                          _staticAnimationController.value,
+                          _topDanmakuItems,
+                          _bottomDanmakuItems,
+                          _option.duration,
+                          _option.fontSize,
+                          _option.fontWeight,
+                          _option.showStroke,
+                          _danmakuHeight,
+                          _running,
+                          _tick,
+                          opacity: _option.opacity,
+                        ),
+                        child: Container(),
+                      );
+                    },
                   ),
-                  if (_specialDanmakuItems.isNotEmpty)
-                    RepaintBoundary(
-                      child: AnimatedBuilder(
-                        animation: _animationController, // 与滚动弹幕共用控制器
-                        builder: (context, child) {
-                          return CustomPaint(
-                            painter: SpecialDanmakuPainter(
-                              _animationController.value,
-                              _specialDanmakuItems,
-                              _option.fontSize,
-                              _option.fontWeight,
-                              _running,
-                              _tick,
-                            ),
-                            child: Container(),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
+                ),
+                if (_specialDanmakuItems.isNotEmpty)
+                  Opacity(
+                      opacity: _option.opacity,
+                      child: RepaintBoundary(
+                        child: AnimatedBuilder(
+                          animation: _animationController, // 与滚动弹幕共用控制器
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: SpecialDanmakuPainter(
+                                _animationController.value,
+                                _specialDanmakuItems,
+                                _option.fontSize,
+                                _option.fontWeight,
+                                _running,
+                                _tick,
+                              ),
+                              child: Container(),
+                            );
+                          },
+                        ),
+                      )),
+              ],
             ),
           ),
         );

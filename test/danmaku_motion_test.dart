@@ -66,6 +66,46 @@ void main() {
     repaint.dispose();
   });
 
+  test('慢中高速度对应实际位移，半透明文字直接绘制到画布', () async {
+    for (final duration in [14, 10, 6]) {
+      final repaint = ValueNotifier(0);
+      final item = DanmakuItem(
+        content: DanmakuContentItem('X', color: Colors.white),
+        creationTime: 0,
+        width: 100,
+        height: 30,
+      );
+      final painter = ScrollDanmakuPainter(
+        items: [item],
+        durationSeconds: duration,
+        fontSize: 30,
+        fontWeight: 4,
+        showStroke: false,
+        opacity: 0.4,
+        tick: () => 3000,
+        repaint: repaint,
+      );
+      final recorder = ui.PictureRecorder();
+      painter.paint(Canvas(recorder), const Size(200, 80));
+      expect(
+        item.xPosition,
+        closeTo(200 - 3000 / (duration * 1000) * 300, 0.001),
+      );
+      final picture = recorder.endRecording();
+      final image = picture.toImageSync(300, 80);
+      final pixels = await image.toByteData();
+      var maxAlpha = 0;
+      for (var i = 3; i < pixels!.lengthInBytes; i += 4) {
+        final alpha = pixels.getUint8(i);
+        if (alpha > maxAlpha) maxAlpha = alpha;
+      }
+      expect(maxAlpha, inInclusiveRange(100, 103));
+      image.dispose();
+      picture.dispose();
+      repaint.dispose();
+    }
+  });
+
   testWidgets('滚动绘制沿用同一画笔，不按每帧重建Widget；暂停清空销毁安全', (tester) async {
     DanmakuController? controller;
     await tester.pumpWidget(

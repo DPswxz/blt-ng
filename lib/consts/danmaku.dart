@@ -11,3 +11,7 @@ const danmakuAreaLabels = {
 };
 String danmakuTransparencyLabel(int value) =>
     value == 0 ? '0%（不透明）' : '$value%';
+
+const defaultDanmakuSpeed = 1;
+const danmakuSpeedLabels = {0: '慢', 1: '中', 2: '高'};
+const danmakuSpeedDurations = {0: 14, 1: 10, 2: 6};

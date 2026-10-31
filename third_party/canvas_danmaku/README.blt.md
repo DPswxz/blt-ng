@@ -9,3 +9,9 @@ unless advanced comments exist. Public controller API remains compatible.
 BLT 1.0.25 samples scroll positions from Flutter's vsync frame timestamp rather
 than paint-time wall-clock samples; pause/clear and empty queues reset the frame
 origin. Display cadence is requested by the app rather than the video Surface.
+
+BLT 1.0.27 applies opacity to cached text/stroke paragraphs rather than compositing
+the entire normal danmaku layer through Opacity. Advanced danmaku keeps its own
+Opacity wrapper. Font metrics reuse the fill paragraph; occupied tracks reject
+comments before stroke shaping. Speed changes clear active comments so positions
+do not jump when duration changes.

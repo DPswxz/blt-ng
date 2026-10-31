@@ -1,3 +1,4 @@
+import 'package:blt/utils/playback_navigation.dart';
 import 'package:blt/widgets/playback_mode_icon.dart';
 import 'package:blt/storages/season_history.dart';
 import 'package:blt/utils/playback_completion.dart';
@@ -931,7 +932,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return;
     }
     if (!mounted) return;
-    Get.off(
+    openPlaybackPage(
       () => VideoPlayerPage(
         video: widget.video,
         cid: _currentCid.value,
@@ -944,7 +945,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         seasonId: widget.seasonId,
         recoveredNative: recovered,
       ),
-      preventDuplicates: false,
+      replace: true,
     );
   }
 
@@ -959,19 +960,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (!mounted || selected == null || selected == widget.decoderMode) return;
     await Settings.setString(Settings.pathDecoderMode, selected);
     if (mounted) await _replaceDecoder(selected);
-  }
-
-  Future<void> _onDefaultQualityTapped() async {
-    final selected = await showPlayerPicker<int>(
-      context: context,
-      title: '进入视频默认画质 · 无对应画质时选较低',
-      options: defaultQualityLabels.keys.toList(),
-      current: _defaultQuality,
-      labelOf: (v) => defaultQualityLabels[v]!,
-    );
-    if (!mounted || selected == null) return;
-    await Settings.setInt(Settings.pathDefaultQuality, selected);
-    setState(() => _defaultQuality = selected);
   }
 
   Future<void> _onCodecTapped() async {
@@ -1089,11 +1077,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _onBack(didPop),
       child: Scaffold(
+        backgroundColor: Colors.black,
         body: KeyboardListener(
           autofocus: true,
           focusNode: _screenFocusNode,
           onKeyEvent: _onKeyEvent,
           child: Stack(
+            fit: StackFit.expand,
             children: [
               _buildVideo(),
               StreamBuilder<bool>(
@@ -1288,13 +1278,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   List<PlayerPanelRow> _buildPanelRows() {
     return [
-      PlayerPanelRow.item(
-        kind: PlayerControlKind.defaultQuality,
-        icon: Icons.high_quality,
-        label: '进入视频默认画质',
-        value: defaultQualityLabels[_defaultQuality],
-        onSelect: _onDefaultQualityTapped,
-      ),
       PlayerPanelRow.item(
         kind: PlayerControlKind.decoder,
         icon: Icons.memory,

@@ -1,3 +1,4 @@
+import 'package:blt/utils/playback_navigation.dart';
 import 'package:blt/widgets/horizontal_rail_boundary.dart';
 import 'package:blt/pages/season_detail.dart';
 import 'package:blt/widgets/video_actions.dart';
@@ -33,7 +34,6 @@ import 'package:blt/widgets/video_card.dart';
 import 'package:blt/widgets/video_grid_view.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 // 相关推荐卡片与主页卡片使用同一规格（videoCardAspectRatio）
 
@@ -192,38 +192,47 @@ class _VideoDetailPageState extends State<VideoDetailPage> {
     super.dispose();
   }
 
+  bool _openingPlayback = false;
+
   Future<void> _onCoverTapped() async {
-    final danmu = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
-    final ha = await Settings.getBool(Settings.pathHASwitch) ?? true;
-    final vo =
-        VideoOutputDrivers.parse(
-          await Settings.getString(Settings.pathVOSwitch) ??
-              VideoOutputDrivers.gpu.value,
-        ) ??
-        VideoOutputDrivers.gpu;
-    final hwdec =
-        HardwareVideoDecoder.parse(
-          await Settings.getString(Settings.pathHwdecSwitch) ??
-              HardwareVideoDecoder.autoSafe.value,
-        ) ??
-        HardwareVideoDecoder.autoSafe;
-    if (await Settings.getInt(Settings.pathEngineVersion) != 2) {
-      await Settings.setString(Settings.pathDecoderMode, 'auto');
-      await Settings.setInt(Settings.pathEngineVersion, 2);
+    if (_openingPlayback) return;
+    _openingPlayback = true;
+    try {
+      final danmu = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
+      final ha = await Settings.getBool(Settings.pathHASwitch) ?? true;
+      final vo =
+          VideoOutputDrivers.parse(
+            await Settings.getString(Settings.pathVOSwitch) ??
+                VideoOutputDrivers.gpu.value,
+          ) ??
+          VideoOutputDrivers.gpu;
+      final hwdec =
+          HardwareVideoDecoder.parse(
+            await Settings.getString(Settings.pathHwdecSwitch) ??
+                HardwareVideoDecoder.autoSafe.value,
+          ) ??
+          HardwareVideoDecoder.autoSafe;
+      if (await Settings.getInt(Settings.pathEngineVersion) != 2) {
+        await Settings.setString(Settings.pathDecoderMode, 'auto');
+        await Settings.setInt(Settings.pathEngineVersion, 2);
+      }
+      final decoderMode =
+          await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
+      if (!mounted) return;
+      await openPlaybackPage(
+        () => VideoPlayerPage(
+          decoderMode: decoderMode,
+          video: widget.video,
+          cid: _currentEpisodeCid.value,
+          danmu: danmu,
+          ha: ha,
+          vo: vo,
+          hwdec: hwdec,
+        ),
+      );
+    } finally {
+      _openingPlayback = false;
     }
-    final decoderMode =
-        await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
-    Get.to(
-      () => VideoPlayerPage(
-        decoderMode: decoderMode,
-        video: widget.video,
-        cid: _currentEpisodeCid.value,
-        danmu: danmu,
-        ha: ha,
-        vo: vo,
-        hwdec: hwdec,
-      ),
-    );
   }
 
   void _onVideoTapped(int _, MediaCardInfo video) {

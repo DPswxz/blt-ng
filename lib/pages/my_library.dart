@@ -1,3 +1,4 @@
+import 'package:blt/utils/playback_navigation.dart';
 import 'dart:async';
 import 'package:blt/consts/color.dart';
 import 'package:blt/pages/season_detail.dart';
@@ -48,7 +49,7 @@ Future<void> playLibraryEpisode(
       cid: episode.cid!,
       episodes: libraryPlaybackEpisodes(episodes ?? [episode]),
     );
-    await Get.to(
+    await openPlaybackPage(
       () => VideoPlayerPage(
         video: video,
         seasonId: season.id,

@@ -85,15 +85,47 @@ void main() {
         find.byType(FractionallySizedBox),
       );
       expect(box.heightFactor, area / 100);
-      final opacity = t.widget<Opacity>(
+      expect(
+        t.widget<DanmakuScreen>(find.byType(DanmakuScreen)).option.opacity,
+        closeTo(0.4, 0.001),
+      );
+      expect(
         find.descendant(
           of: find.byType(DanmakuScreen),
           matching: find.byType(Opacity),
         ),
+        findsNothing,
       );
-      expect(opacity.opacity, closeTo(0.4, 0.001));
       expect(await Settings.getInt(Settings.pathDanmuArea), area);
       expect(t.takeException(), isNull);
+    }
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(milliseconds: 200));
+    controller.dispose();
+  });
+  testWidgets('移动速度设置实时应用为14/10/6秒并保留透明度', (t) async {
+    final controller = BilibiliDanmakuWallController(true);
+    await pumpPage(
+      t,
+      BilibiliDanmakuWall(
+        controller: controller,
+        cid: 1,
+        timeline: const Stream<Duration>.empty(),
+        playing: const Stream<bool>.empty(),
+      ),
+    );
+    await flush(t);
+    expect(
+      t.widget<DanmakuScreen>(find.byType(DanmakuScreen)).option.duration,
+      10,
+    );
+    for (final entry in {0: 14, 1: 10, 2: 6, 99: 10}.entries) {
+      await Settings.setInt(Settings.pathDanmuSpeed, entry.key);
+      await controller.reloadSettings();
+      await flush(t);
+      final option = t.widget<DanmakuScreen>(find.byType(DanmakuScreen)).option;
+      expect(option.duration, entry.value);
+      expect(option.opacity, 0.6);
     }
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(milliseconds: 200));

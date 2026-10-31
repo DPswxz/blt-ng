@@ -4,7 +4,8 @@ import '/models/danmaku_content_item.dart';
 
 class Utils {
   static generateParagraph(DanmakuContentItem content, double danmakuWidth,
-      double fontSize, int fontWeight) {
+      double fontSize, int fontWeight,
+      {double opacity = 1}) {
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(ui.ParagraphStyle(
       textAlign: TextAlign.left,
       fontSize: fontSize,
@@ -12,7 +13,7 @@ class Utils {
       textDirection: TextDirection.ltr,
     ))
       ..pushStyle(ui.TextStyle(
-        color: content.color,
+        color: content.color.withValues(alpha: content.color.a * opacity),
       ))
       ..addText(content.text);
     return builder.build()
@@ -20,11 +21,12 @@ class Utils {
   }
 
   static generateStrokeParagraph(DanmakuContentItem content,
-      double danmakuWidth, double fontSize, int fontWeight) {
+      double danmakuWidth, double fontSize, int fontWeight,
+      {double opacity = 1}) {
     final Paint strokePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..color = Colors.black;
+      ..color = Colors.black.withValues(alpha: opacity);
 
     final ui.ParagraphBuilder strokeBuilder =
         ui.ParagraphBuilder(ui.ParagraphStyle(

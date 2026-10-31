@@ -17,6 +17,7 @@ class Settings {
     'danmu',
     'block_weight',
   ];
+  static const pathDanmuSpeed = ['setting', 'danmu', 'speed'];
   static const pathDanmuArea = ['setting', 'danmu', 'area'];
   static const pathDanmuTransparency = ['setting', 'danmu', 'transparency'];
   static const pathDanmuFontSize = ['setting', 'danmu', 'font_size'];

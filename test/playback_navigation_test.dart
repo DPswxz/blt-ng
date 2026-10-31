@@ -1,0 +1,58 @@
+import 'package:blt/utils/playback_navigation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+
+void main() {
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('播放入口首帧为不透明黑底，无滑动转场；替换解码路由也不露侧栏 $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      addTearDown(() => Get.reset());
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: Scaffold(backgroundColor: Colors.white, body: Text('白色侧边栏')),
+        ),
+      );
+      ModalRoute<dynamic>? route;
+      openPlaybackPage(
+        () => Builder(
+          builder: (context) {
+            route = ModalRoute.of(context);
+            return const SizedBox.expand(key: ValueKey('playing'));
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(route!.opaque, isTrue);
+      expect(route!.transitionDuration, Duration.zero);
+      expect(find.text('白色侧边栏'), findsNothing);
+      final background = find
+          .ancestor(
+            of: find.byKey(const ValueKey('playing')),
+            matching: find.byType(ColoredBox),
+          )
+          .first;
+      expect(tester.widget<ColoredBox>(background).color, Colors.black);
+      expect(tester.getSize(background), size);
+      openPlaybackPage(
+        () => const SizedBox.expand(key: ValueKey('replacement')),
+        replace: true,
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const ValueKey('playing')), findsNothing);
+      expect(find.text('白色侧边栏'), findsNothing);
+      Get.back();
+      await tester.pumpAndSettle();
+      expect(find.text('白色侧边栏'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+}

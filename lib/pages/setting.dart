@@ -24,6 +24,7 @@ class _SettingPageState extends State<SettingPage> {
   int _area = defaultDanmakuArea;
   int _transparency = defaultDanmakuTransparency;
   int _weight = 6;
+  int _speed = defaultDanmakuSpeed;
   PlayerLoopMode _loopMode = PlayerLoopMode.none;
   String _decoder = 'auto';
   @override
@@ -64,6 +65,8 @@ class _SettingPageState extends State<SettingPage> {
                 defaultDanmakuTransparency)
             .clamp(0, 90);
     _weight = await Settings.getInt(Settings.pathDanmuBlockWeightSwitch) ?? 6;
+    _speed =
+        await Settings.getInt(Settings.pathDanmuSpeed) ?? defaultDanmakuSpeed;
   }
 
   Widget _sectionTitle(BuildContext context, String title) {
@@ -229,6 +232,20 @@ class _SettingPageState extends State<SettingPage> {
                       Settings.pathDanmuTransparency,
                       _transparency,
                     );
+                  }),
+                ),
+                CustomSettingsDropdownTile<String>(
+                  leading: const Icon(Icons.speed),
+                  title: '弹幕移动速度',
+                  value:
+                      danmakuSpeedLabels[_speed] ??
+                      danmakuSpeedLabels[defaultDanmakuSpeed]!,
+                  items: danmakuSpeedLabels.values.toList(),
+                  onChanged: (value) => setState(() {
+                    _speed = danmakuSpeedLabels.entries
+                        .firstWhere((e) => e.value == value)
+                        .key;
+                    Settings.setInt(Settings.pathDanmuSpeed, _speed);
                   }),
                 ),
                 CustomSettingsDropdownTile<int>(

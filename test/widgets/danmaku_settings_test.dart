@@ -44,6 +44,15 @@ void main() {
       await t.tap(find.text('60%'));
       await t.pumpAndSettle();
       expect(await Settings.getInt(Settings.pathDanmuTransparency), 60);
+      for (final entry in {0: '慢', 1: '中', 2: '高'}.entries) {
+        await t.tap(find.text('打开弹幕'));
+        await t.pumpAndSettle();
+        await t.tap(find.textContaining('移动速度：'));
+        await t.pumpAndSettle();
+        await t.tap(find.text(entry.value));
+        await t.pumpAndSettle();
+        expect(await Settings.getInt(Settings.pathDanmuSpeed), entry.key);
+      }
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox());
       controller.dispose();

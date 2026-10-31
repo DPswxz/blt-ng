@@ -10,6 +10,7 @@ class ScrollDanmakuPainter extends CustomPainter {
   final double fontSize;
   final int fontWeight;
   final bool showStroke;
+  final double opacity;
   final int Function() tick;
 
   ScrollDanmakuPainter({
@@ -19,6 +20,7 @@ class ScrollDanmakuPainter extends CustomPainter {
     required this.fontWeight,
     required this.showStroke,
     required this.tick,
+    this.opacity = 1,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
@@ -29,6 +31,7 @@ class ScrollDanmakuPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    selfSendPaint.color = Colors.green.withValues(alpha: opacity);
     final now = tick();
     for (final item in items) {
       final elapsed = (now - item.creationTime).clamp(
@@ -43,6 +46,7 @@ class ScrollDanmakuPainter extends CustomPainter {
         item.width,
         fontSize,
         fontWeight,
+        opacity: opacity,
       );
       if (showStroke) {
         item.strokeParagraph ??= Utils.generateStrokeParagraph(
@@ -50,6 +54,7 @@ class ScrollDanmakuPainter extends CustomPainter {
           item.width,
           fontSize,
           fontWeight,
+          opacity: opacity,
         );
         canvas.drawParagraph(
           item.strokeParagraph!,

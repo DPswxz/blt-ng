@@ -629,7 +629,7 @@ void main() {
     Size(1920, 1080),
     Size(3840, 2160),
   ]) {
-    testWidgets('三项更多设置靠底部贴合内容，长文本单行缩放不省略 $size', (tester) async {
+    testWidgets('两项更多设置靠底部贴合内容，长文本单行缩放不省略 $size', (tester) async {
       _setScreen(tester, size);
       final ui = UiScale.factorFor(size);
       final panel = ValueNotifier(true);
@@ -643,13 +643,6 @@ void main() {
               panelVisible: panel,
               taps: [],
               panelRows: [
-                PlayerPanelRow.item(
-                  kind: PlayerControlKind.defaultQuality,
-                  icon: Icons.high_quality,
-                  label: '进入视频默认画质',
-                  value: '1080P 高码率 · 大会员',
-                  onSelect: () {},
-                ),
                 PlayerPanelRow.item(
                   kind: PlayerControlKind.decoder,
                   icon: Icons.memory,
@@ -670,8 +663,15 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(PlayerSettingsPanel),
+          matching: find.text('进入视频默认画质'),
+        ),
+        findsNothing,
+      );
       final panelSize = tester.getSize(find.byType(PlayerSettingsPanel));
-      expect(panelSize.height, closeTo(284 * ui + 2 * (ui < 1 ? 1 : ui), 0.1));
+      expect(panelSize.height, closeTo(200 * ui + 2 * (ui < 1 ? 1 : ui), 0.1));
       final lastRow = tester.getRect(find.byType(PlayerPanelTile).last);
       expect(
         tester.getRect(find.byType(PlayerSettingsPanel)).bottom -

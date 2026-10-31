@@ -103,6 +103,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('60%'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('弹幕移动速度'));
+      await tester.tap(find.text('弹幕移动速度'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('高'));
+      await tester.pumpAndSettle();
+      expect(await Settings.getInt(Settings.pathDanmuSpeed), 2);
       final controller = BilibiliDanmakuWallController(
         await Settings.getBool(Settings.pathDanmuSwitch) ?? true,
       );
@@ -120,6 +126,7 @@ void main() {
       final screen = tester.widget<DanmakuScreen>(find.byType(DanmakuScreen));
       expect(screen.option.fontSize, closeTo(48 * size.height / 1080, 0.001));
       expect(screen.option.opacity, 0.4);
+      expect(screen.option.duration, 6);
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(milliseconds: 200));
       controller.dispose();

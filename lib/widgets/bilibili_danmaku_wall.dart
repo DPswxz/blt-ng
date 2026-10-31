@@ -81,6 +81,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
   double _danmuFontSize = defaultDanmakuFontSize.toDouble();
   int _danmuArea = defaultDanmakuArea;
   int _transparency = defaultDanmakuTransparency;
+  int _speed = defaultDanmakuSpeed;
   bool _initDone = false;
   bool _pullDanmaku = false;
   DanmakuTimeline<DanmakuElem>? _timeline;
@@ -181,10 +182,17 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
       final transparency =
           await Settings.getInt(Settings.pathDanmuTransparency) ??
           defaultDanmakuTransparency;
+      final speed =
+          await Settings.getInt(Settings.pathDanmuSpeed) ?? defaultDanmakuSpeed;
       if (!mounted) return;
+      final newSpeed = danmakuSpeedLabels.containsKey(speed)
+          ? speed
+          : defaultDanmakuSpeed;
+      if (_speed != newSpeed) _onClear();
       final newArea = danmakuAreaLabels.containsKey(area) ? area : 10;
       if (_danmuArea != newArea) widget.controller.clearDanmaku();
       setState(() {
+        _speed = newSpeed;
         _danmuArea = newArea;
         _transparency = transparency.clamp(0, 90);
         _danmuBlockWeight = weight ?? 6;
@@ -358,6 +366,7 @@ class _BilibiliDanmakuWallState extends State<BilibiliDanmakuWall> {
 
   DanmakuOption _option(double ui) => DanmakuOption(
     fontSize: _danmuFontSize * ui,
+    duration: danmakuSpeedDurations[_speed]!,
     opacity: 1 - _transparency / 100,
     safeArea: false,
   );
