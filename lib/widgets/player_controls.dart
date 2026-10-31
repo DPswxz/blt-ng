@@ -497,10 +497,11 @@ class PlayerPanelTile extends StatelessWidget {
             children: [
               Icon(row.icon, size: 34 * ui, color: mainColor),
               SizedBox(width: 18 * ui),
-              Expanded(
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 280 * ui),
                 child: Text(
                   row.label ?? '',
-                  maxLines: 2,
+                  softWrap: true,
                   overflow: TextOverflow.visible,
                   style: TextStyle(fontSize: 28 * ui, color: mainColor),
                 ),
@@ -509,15 +510,18 @@ class PlayerPanelTile extends StatelessWidget {
                 _PlayerSwitch(ui: ui, value: row.switchValue)
               else ...[
                 if (row.value != null)
-                  Text(
-                    row.value!,
-                    maxLines: 2,
-                    overflow: TextOverflow.visible,
-                    style: TextStyle(
-                      fontSize: 26 * ui,
-                      color: row.enabled
-                          ? Colors.white.withValues(alpha: 0.85)
-                          : Colors.white24,
+                  Expanded(
+                    child: Text(
+                      row.value!,
+                      softWrap: true,
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.visible,
+                      style: TextStyle(
+                        fontSize: 26 * ui,
+                        color: row.enabled
+                            ? Colors.white.withValues(alpha: 0.85)
+                            : Colors.white24,
+                      ),
                     ),
                   ),
                 SizedBox(width: 8 * ui),
@@ -760,7 +764,11 @@ class _PlayerControlLayerState extends State<PlayerControlLayer> {
                     top: 28 * ui,
                     right: 40 * ui,
                     bottom: 12 * ui,
-                    child: PlayerSettingsPanel(children: _buildPanelRows(ui)),
+                    left: 0,
+                    child: Align(
+                      alignment: Alignment.bottomRight,
+                      child: PlayerSettingsPanel(children: _buildPanelRows(ui)),
+                    ),
                   ),
               ],
             ),
@@ -784,9 +792,10 @@ class _PlayerControlLayerState extends State<PlayerControlLayer> {
       final isLast = rowIndex == lastIndex;
       // 固定行高，删除重复项后也不拉伸剩余选项。
       rows.add(
-        SizedBox(
-          height: 84 * ui,
+        ConstrainedBox(
+          constraints: BoxConstraints(minHeight: 84 * ui),
           child: Center(
+            heightFactor: 1,
             child: PlayerPanelTile(
               key: ValueKey('panel-${row.kind!.name}-$rowIndex'),
               row: row,

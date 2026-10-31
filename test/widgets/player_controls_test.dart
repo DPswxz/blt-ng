@@ -624,6 +624,84 @@ void main() {
     });
   }
 
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('三项真实更多设置贴合内容，长文本换行不省略 $size', (tester) async {
+      _setScreen(tester, size);
+      final ui = UiScale.factorFor(size);
+      final panel = ValueNotifier(true);
+      addTearDown(panel.dispose);
+      await tester.pumpWidget(
+        _host(
+          ui: ui,
+          child: RepaintBoundary(
+            key: const ValueKey('panel-preview'),
+            child: _layer(
+              panelVisible: panel,
+              taps: [],
+              panelRows: [
+                PlayerPanelRow.item(
+                  kind: PlayerControlKind.defaultQuality,
+                  icon: Icons.high_quality,
+                  label: '进入视频默认画质',
+                  value: '1080P 高码率 · 大会员',
+                  onSelect: () {},
+                ),
+                PlayerPanelRow.item(
+                  kind: PlayerControlKind.decoder,
+                  icon: Icons.memory,
+                  label: '解码方式',
+                  value: '自动（ExoPlayer）',
+                  onSelect: () {},
+                ),
+                PlayerPanelRow.item(
+                  kind: PlayerControlKind.codec,
+                  icon: Icons.tune,
+                  label: '视频编码偏好',
+                  value: '自动（AVC 优先）',
+                  onSelect: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final panelSize = tester.getSize(find.byType(PlayerSettingsPanel));
+      expect(panelSize.height, lessThanOrEqualTo(400 * ui));
+      final lastRow = tester.getRect(find.byType(PlayerPanelTile).last);
+      expect(
+        tester.getRect(find.byType(PlayerSettingsPanel)).bottom -
+            lastRow.bottom,
+        lessThanOrEqualTo(30 * ui),
+      );
+      final anchor = find
+          .ancestor(
+            of: find.byType(PlayerSettingsPanel),
+            matching: find.byType(Align),
+          )
+          .first;
+      expect(tester.widget<Align>(anchor).alignment, Alignment.bottomRight);
+      expect(
+        tester.getRect(find.byType(PlayerSettingsPanel)).bottom,
+        closeTo(tester.getRect(anchor).bottom, 0.1),
+      );
+      for (final text in tester.widgetList<Text>(
+        find.descendant(
+          of: find.byType(PlayerSettingsPanel),
+          matching: find.byType(Text),
+        ),
+      )) {
+        expect(text.overflow, isNot(TextOverflow.ellipsis));
+        expect(text.maxLines, isNull);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('选择弹窗展示当前值并可切换', (tester) async {
     _setScreen(tester, const Size(1920, 1080));
     PlayerAspectMode? selected;
