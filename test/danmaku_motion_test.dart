@@ -81,7 +81,9 @@ void main() {
     final finder = find.byWidgetPredicate(
       (w) => w is CustomPaint && w.painter is ScrollDanmakuPainter,
     );
-    final painter = tester.widget<CustomPaint>(finder).painter;
+    final painter =
+        tester.widget<CustomPaint>(finder).painter as ScrollDanmakuPainter;
+    final firstTick = painter.tick();
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 16));
     }
@@ -89,6 +91,7 @@ void main() {
       identical(tester.widget<CustomPaint>(finder).painter, painter),
       isTrue,
     );
+    expect(painter.tick() - firstTick, 80);
     controller!.pause();
     controller!.resume();
     controller!.pause();

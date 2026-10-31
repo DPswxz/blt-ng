@@ -158,6 +158,7 @@ Widget _layer({
   bool playing = false,
   bool visible = true,
   String title = '测试视频标题',
+  List<PlayerPanelRow>? panelRows,
 }) => PlayerControlLayer(
   title: title,
   uploader: '测试UP主',
@@ -167,7 +168,7 @@ Widget _layer({
   progressBar: const SizedBox(height: 60),
   playing: playing,
   actions: _actions(taps),
-  panelRows: _panelRows(taps),
+  panelRows: panelRows ?? _panelRows(taps),
 );
 
 Finder _barItem(PlayerControlKind kind, String label) => find.descendant(
@@ -590,6 +591,36 @@ void main() {
       );
       await tester.pump();
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('更多设置减少选项后仍保持84行高 $size', (tester) async {
+      _setScreen(tester, size);
+      final panel = ValueNotifier(true);
+      addTearDown(panel.dispose);
+      final ui = UiScale.factorFor(size);
+      for (final count in [8, 3]) {
+        await tester.pumpWidget(
+          _host(
+            ui: ui,
+            child: _layer(
+              panelVisible: panel,
+              taps: [],
+              panelRows: _panelRows([]).take(count).toList(),
+            ),
+          ),
+        );
+        await tester.pump();
+        final first = tester.getCenter(_panelItem(0, '画质·清晰度'));
+        final second = tester.getCenter(_panelItem(1, '播放倍速'));
+        expect(second.dy - first.dy, closeTo(84 * ui, 0.01));
+        expect(tester.takeException(), isNull);
+      }
     });
   }
 

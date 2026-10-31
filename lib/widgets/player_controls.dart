@@ -442,9 +442,11 @@ class PlayerSettingsPanel extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }
@@ -780,9 +782,10 @@ class _PlayerControlLayerState extends State<PlayerControlLayer> {
       }
       final rowIndex = index++;
       final isLast = rowIndex == lastIndex;
-      // 面板高度由外层撑满，行在各自槽位内居中，行距随可用高度自适应
+      // 固定行高，删除重复项后也不拉伸剩余选项。
       rows.add(
-        Expanded(
+        SizedBox(
+          height: 84 * ui,
           child: Center(
             child: PlayerPanelTile(
               key: ValueKey('panel-${row.kind!.name}-$rowIndex'),

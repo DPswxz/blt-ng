@@ -45,6 +45,9 @@ class TclPlayerView(context: Context, id: Int, messenger: BinaryMessenger) : Pla
     private var dropped = 0
     private var rendered = 0
     private val player = ExoPlayer.Builder(context)
+        // Keep Flutter/danmaku at the display cadence instead of asking Android
+        // to match a 24/25/30fps video's Surface. The app selects its display mode.
+        .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
         .setRenderersFactory(DefaultRenderersFactory(context).setEnableDecoderFallback(true))
         .setLoadControl(DefaultLoadControl.Builder()
             .setBufferDurationsMs(15000, 45000, 1000, 2000)

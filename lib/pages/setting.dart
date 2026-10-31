@@ -1,3 +1,5 @@
+import 'package:blt/consts/settings.dart';
+import 'package:blt/widgets/playback_mode_icon.dart';
 import 'package:blt/consts/danmaku.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:blt/utils/playback_policy.dart';
@@ -22,6 +24,7 @@ class _SettingPageState extends State<SettingPage> {
   int _area = defaultDanmakuArea;
   int _transparency = defaultDanmakuTransparency;
   int _weight = 6;
+  PlayerLoopMode _loopMode = PlayerLoopMode.none;
   String _decoder = 'auto';
   @override
   void initState() {
@@ -46,6 +49,11 @@ class _SettingPageState extends State<SettingPage> {
     _codec = await Settings.getInt(Settings.pathPreferredCodec) ?? 0;
     _decoder = await Settings.getString(Settings.pathDecoderMode) ?? 'auto';
     _audio = await Settings.getInt(Settings.pathPreferredAudio) ?? 0;
+    _loopMode =
+        PlayerLoopMode.parse(
+          await Settings.getString(Settings.pathLoopModeSwitch),
+        ) ??
+        PlayerLoopMode.none;
     _danmakuEnabled = await Settings.getBool(Settings.pathDanmuSwitch) ?? true;
     _fontSize =
         await Settings.getInt(Settings.pathDanmuFontSize) ??
@@ -148,6 +156,23 @@ class _SettingPageState extends State<SettingPage> {
                         .firstWhere((e) => e.value == value)
                         .key;
                     Settings.setInt(Settings.pathPreferredAudio, _audio);
+                  }),
+                ),
+                CustomSettingsDropdownTile<String>(
+                  leading: Icon(playbackModeIcon(_loopMode)),
+                  title: '播放完后',
+                  value: _loopMode.description,
+                  items: PlayerLoopMode.values
+                      .map((mode) => mode.description)
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _loopMode = PlayerLoopMode.values.firstWhere(
+                      (mode) => mode.description == value,
+                    );
+                    Settings.setString(
+                      Settings.pathLoopModeSwitch,
+                      _loopMode.value,
+                    );
                   }),
                 ),
               ],

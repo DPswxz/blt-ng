@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import 'package:canvas_danmaku/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'models/danmaku_item.dart';
@@ -71,6 +72,18 @@ class _DanmakuScreenState extends State<DanmakuScreen>
 
   final _stopwatch = Stopwatch();
   Timer? _cleanupTimer;
+  Duration? _frameOrigin;
+  int _frameBaseTick = 0;
+  int _paintTick = 0;
+
+  void _sampleFrameTime() {
+    final timestamp = SchedulerBinding.instance.currentFrameTimeStamp;
+    if (_frameOrigin == null) {
+      _frameOrigin = timestamp;
+      _frameBaseTick = _tick;
+    }
+    _paintTick = _frameBaseTick + (timestamp - _frameOrigin!).inMilliseconds;
+  }
 
   /// 运行状态
   bool _running = true;
@@ -96,6 +109,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
       duration: Duration(seconds: _option.duration),
     );
 
+    _animationController.addListener(_sampleFrameTime);
     _staticAnimationController = AnimationController(
       vsync: this,
       duration: Duration(seconds: _option.duration),
@@ -116,6 +130,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
   void dispose() {
     _running = false;
     WidgetsBinding.instance.removeObserver(this);
+    _animationController.removeListener(_sampleFrameTime);
     _animationController.dispose();
     _staticAnimationController.dispose();
     _cleanupTimer?.cancel();
@@ -332,6 +347,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
       if (_animationController.isAnimating) {
         _animationController.stop();
       }
+      _frameOrigin = null;
       _cleanupTimer?.cancel();
       _cleanupTimer = null;
       if (_stopwatch.isRunning) {
@@ -424,6 +440,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
       _specialDanmakuItems.clear();
     });
     _animationController.stop();
+    _frameOrigin = null;
   }
 
   /// 确定滚动弹幕是否可以添加
@@ -495,6 +512,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
       );
       if (_scrollDanmakuItems.isEmpty && _specialDanmakuItems.isEmpty) {
         _animationController.stop();
+        _frameOrigin = null;
       }
       if ((hadScroll && _scrollDanmakuItems.isEmpty) ||
           oldSpecialCount != _specialDanmakuItems.length ||
@@ -550,7 +568,7 @@ class _DanmakuScreenState extends State<DanmakuScreen>
                         fontSize: _option.fontSize,
                         fontWeight: _option.fontWeight,
                         showStroke: _option.showStroke,
-                        tick: () => _tick,
+                        tick: () => _paintTick,
                         repaint: _animationController,
                       ),
                       child: const SizedBox.expand(),

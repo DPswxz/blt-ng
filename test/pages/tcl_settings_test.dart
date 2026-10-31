@@ -1,3 +1,5 @@
+import 'package:blt/consts/settings.dart';
+import 'package:blt/widgets/playback_mode_icon.dart';
 import 'package:blt/widgets/custom_setting_tiles.dart';
 import 'package:blt/widgets/bilibili_danmaku_wall.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
@@ -59,6 +61,22 @@ void main() {
       await tester.tap(find.text('AAC · 132K'));
       await tester.pumpAndSettle();
       expect(await Settings.getInt(Settings.pathPreferredAudio), 30232);
+      await tester.ensureVisible(find.text('播放完后'));
+      for (final mode in [
+        PlayerLoopMode.next,
+        PlayerLoopMode.single,
+        PlayerLoopMode.none,
+      ]) {
+        await tester.tap(find.text('播放完后'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(mode.description).last);
+        await tester.pumpAndSettle();
+        expect(
+          await Settings.getString(Settings.pathLoopModeSwitch),
+          mode.value,
+        );
+        expect(find.byIcon(playbackModeIcon(mode)), findsOneWidget);
+      }
       await tester.ensureVisible(find.text('开启弹幕'));
       final toggle = tester.widget<CustomSettingsSwitchTile>(
         find.byType(CustomSettingsSwitchTile),
