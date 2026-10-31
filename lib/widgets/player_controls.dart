@@ -499,11 +499,16 @@ class PlayerPanelTile extends StatelessWidget {
               SizedBox(width: 18 * ui),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 280 * ui),
-                child: Text(
-                  row.label ?? '',
-                  softWrap: true,
-                  overflow: TextOverflow.visible,
-                  style: TextStyle(fontSize: 28 * ui, color: mainColor),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    row.label ?? '',
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.visible,
+                    style: TextStyle(fontSize: 28 * ui, color: mainColor),
+                  ),
                 ),
               ),
               if (row.isSwitch)
@@ -511,16 +516,20 @@ class PlayerPanelTile extends StatelessWidget {
               else ...[
                 if (row.value != null)
                   Expanded(
-                    child: Text(
-                      row.value!,
-                      softWrap: true,
-                      textAlign: TextAlign.end,
-                      overflow: TextOverflow.visible,
-                      style: TextStyle(
-                        fontSize: 26 * ui,
-                        color: row.enabled
-                            ? Colors.white.withValues(alpha: 0.85)
-                            : Colors.white24,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        row.value!,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.visible,
+                        style: TextStyle(
+                          fontSize: 26 * ui,
+                          color: row.enabled
+                              ? Colors.white.withValues(alpha: 0.85)
+                              : Colors.white24,
+                        ),
                       ),
                     ),
                   ),

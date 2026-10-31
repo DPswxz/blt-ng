@@ -629,7 +629,7 @@ void main() {
     Size(1920, 1080),
     Size(3840, 2160),
   ]) {
-    testWidgets('三项真实更多设置贴合内容，长文本换行不省略 $size', (tester) async {
+    testWidgets('三项更多设置靠底部贴合内容，长文本单行缩放不省略 $size', (tester) async {
       _setScreen(tester, size);
       final ui = UiScale.factorFor(size);
       final panel = ValueNotifier(true);
@@ -671,7 +671,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       final panelSize = tester.getSize(find.byType(PlayerSettingsPanel));
-      expect(panelSize.height, lessThanOrEqualTo(400 * ui));
+      expect(panelSize.height, closeTo(284 * ui + 2 * (ui < 1 ? 1 : ui), 0.1));
       final lastRow = tester.getRect(find.byType(PlayerPanelTile).last);
       expect(
         tester.getRect(find.byType(PlayerSettingsPanel)).bottom -
@@ -696,7 +696,8 @@ void main() {
         ),
       )) {
         expect(text.overflow, isNot(TextOverflow.ellipsis));
-        expect(text.maxLines, isNull);
+        expect(text.maxLines, 1);
+        expect(text.softWrap, isFalse);
       }
       expect(tester.takeException(), isNull);
     });
