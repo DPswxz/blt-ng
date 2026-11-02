@@ -62,6 +62,7 @@ class SidePanelTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final bool autofocus;
+  final bool immediateFeedback;
   final double width;
   final double height;
   final double radius;
@@ -75,6 +76,7 @@ class SidePanelTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.autofocus = false,
+    this.immediateFeedback = false,
     this.width = 116,
     this.height = 104,
     this.radius = 26,
@@ -91,9 +93,15 @@ class SidePanelTile extends StatelessWidget {
       child: DpadFocusable(
         autofocus: autofocus,
         onSelect: onTap,
-        builder: pinkFocusEffect(ui: ui, radius: radius * ui),
+        builder: pinkFocusEffect(
+          ui: ui,
+          radius: radius * ui,
+          immediateFocusLoss: immediateFeedback,
+        ),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: immediateFeedback && !selected
+              ? Duration.zero
+              : const Duration(milliseconds: 150),
           width: width * ui,
           height: height * ui,
           decoration: BoxDecoration(

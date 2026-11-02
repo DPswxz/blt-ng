@@ -1,3 +1,6 @@
+import 'package:blt/consts/color.dart';
+import 'package:blt/widgets/side_panel.dart';
+import 'package:flutter/rendering.dart';
 import 'package:blt/storages/search_history.dart';
 import 'package:blt/pages/search.dart';
 import 'package:blt/widgets/pink_style.dart';
@@ -27,6 +30,56 @@ void main() {
         },
       }),
     );
+  }
+
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('点击快速切换侧栏，旧焦点与选中色块无需等待动画即消失 $size', (tester) async {
+      mockRecommend();
+      await pumpPage(tester, const app.Page(), size: size);
+      await flush(tester);
+      await tester.pump(const Duration(milliseconds: 200));
+      for (final label in ['设置', '首页', '设置', '首页']) {
+        final previous = label == '设置' ? '首页' : '设置';
+        await tester.tap(find.text(label));
+        await tester.pump();
+        await tester.pump();
+        final sidebar = tester.widget<Sidebar>(find.byType(Sidebar));
+        final active = sidebar.items.singleWhere((item) => item.label == label);
+        final old = sidebar.items.singleWhere((item) => item.label == previous);
+        expect(active.selected, isTrue);
+        expect(active.focusAnchor!.hasFocus, isTrue);
+        expect(old.selected, isFalse);
+        expect(old.focusAnchor!.hasFocus, isFalse);
+        final oldTile = find
+            .ancestor(
+              of: find.text(previous),
+              matching: find.byType(SidePanelTile),
+            )
+            .first;
+        for (final element
+            in find
+                .descendant(of: oldTile, matching: find.byType(DecoratedBox))
+                .evaluate()) {
+          final box = tester.renderObject<RenderDecoratedBox>(
+            find.byElementPredicate(
+              (candidate) => identical(candidate, element),
+            ),
+          );
+          final decoration = box.decoration as BoxDecoration;
+          expect(decoration.color, isNot(focusableSurfaceColor));
+          expect(decoration.border?.top.color, isNot(biliPink));
+        }
+        final halo = tester.widget<CustomPaint>(
+          find.descendant(of: oldTile, matching: find.byType(CustomPaint)),
+        );
+        expect((halo.painter as dynamic).progress, 0.0);
+      }
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('初始展示首页，侧边栏展示全部入口', (tester) async {

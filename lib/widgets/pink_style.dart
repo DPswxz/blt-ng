@@ -22,9 +22,12 @@ Widget buildPinkFocusEffect({
   Color? backgroundColor,
   Color? focusedBackgroundColor,
   double scale = 1.0,
+  bool immediateFocusLoss = false,
 }) {
   final effect = AnimatedContainer(
-    duration: const Duration(milliseconds: 150),
+    duration: immediateFocusLoss && !isFocused
+        ? Duration.zero
+        : const Duration(milliseconds: 150),
     decoration: BoxDecoration(
       color: isFocused
           ? (focusedBackgroundColor ?? backgroundColor)
@@ -41,6 +44,7 @@ Widget buildPinkFocusEffect({
     ui: ui,
     radius: radius,
     isFocused: isFocused,
+    immediateFocusLoss: immediateFocusLoss,
     child: effect,
   );
   if (scale == 1.0) return halo;
@@ -61,12 +65,14 @@ class _FocusHalo extends StatelessWidget {
   final double ui;
   final double radius;
   final bool isFocused;
+  final bool immediateFocusLoss;
   final Widget child;
 
   const _FocusHalo({
     required this.ui,
     required this.radius,
     required this.isFocused,
+    required this.immediateFocusLoss,
     required this.child,
   });
 
@@ -74,7 +80,9 @@ class _FocusHalo extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: isFocused ? 1 : 0),
-      duration: const Duration(milliseconds: 150),
+      duration: immediateFocusLoss && !isFocused
+          ? Duration.zero
+          : const Duration(milliseconds: 150),
       curve: Curves.easeOut,
       builder: (context, progress, child) => CustomPaint(
         painter: _FocusHaloPainter(progress: progress, ui: ui, radius: radius),
@@ -142,6 +150,7 @@ FocusEffectBuilder pinkFocusEffect({
   Color? backgroundColor,
   Color? focusedBackgroundColor,
   double scale = 1.0,
+  bool immediateFocusLoss = false,
 }) {
   return (context, isFocused, child) => buildPinkFocusEffect(
     ui: ui,
@@ -152,6 +161,7 @@ FocusEffectBuilder pinkFocusEffect({
     backgroundColor: backgroundColor,
     focusedBackgroundColor: focusedBackgroundColor,
     scale: scale,
+    immediateFocusLoss: immediateFocusLoss,
     child: child ?? const SizedBox.shrink(),
   );
 }

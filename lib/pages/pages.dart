@@ -142,6 +142,12 @@ class _PageState extends State<Page> {
     }
 
     final index = _tabs.indexOf(tab);
+    // Pointer activation does not move DpadFocusable's keyboard focus itself.
+    // Move it with selection so the previous tab cannot retain its focus halo.
+    _pageFocusNodes[index].descendants
+        .where((node) => node.canRequestFocus && !node.skipTraversal)
+        .firstOrNull
+        ?.requestFocus();
     if (_currentPageIndex.value != index) {
       if (tab.child is SettingPage || tab.child is UserInfoPage) {
         tab.onTappedListener.value++;

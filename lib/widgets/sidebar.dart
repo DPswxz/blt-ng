@@ -82,7 +82,11 @@ class _SidebarAvatar extends StatelessWidget {
       onTap: onTap,
       child: DpadFocusable(
         onSelect: onTap,
-        builder: pinkFocusEffect(ui: ui, radius: 46 * ui),
+        builder: pinkFocusEffect(
+          ui: ui,
+          radius: 46 * ui,
+          immediateFocusLoss: true,
+        ),
         child: child,
       ),
     );
@@ -134,6 +138,7 @@ class _SidebarTab extends StatelessWidget {
         ),
         label: item.label,
         selected: item.selected,
+        immediateFeedback: true,
         autofocus: item.autofocus,
         onTap: item.onTap,
       ),
