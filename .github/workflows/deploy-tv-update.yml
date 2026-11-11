@@ -1,0 +1,78 @@
+name: Deploy TV update
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch and verify the published ARMv7 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          version=${RELEASE_TAG#v}
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          cd "$RUNNER_TEMP"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,assets > release.json
+          asset=$(jq -er '
+            select(.isDraft == false)
+            | [.assets[].name | select(test("^[A-Za-z0-9._-]+-armeabi-v7a[.]apk$"))]
+            | select(length == 1) | .[0]' release.json)
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$asset" --dir "$RUNNER_TEMP"
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          if [[ ! -x "$tools/aapt" ]]; then
+            sdkmanager "build-tools;36.0.0"
+          fi
+          "$tools/apksigner" verify --print-certs "$asset" > signer.txt
+          test "$(grep -c 'certificate SHA-256 digest:' signer.txt)" -eq 1
+          grep -Fxq 'Signer #1 certificate SHA-256 digest: 14073b5914751c32eec485145e7d2d4effa5f614340254b099cd47d7d47a579c' signer.txt
+          "$tools/aapt" dump badging "$asset" > badging.txt
+          grep -Fxq "native-code: 'armeabi-v7a'" badging.txt
+          python3 - "$asset" "$version" <<'PY'
+          import hashlib, json, re, sys
+          from pathlib import Path
+          apk, version = Path(sys.argv[1]), sys.argv[2]
+          match = re.match(
+              r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'",
+              Path("badging.txt").read_text(),
+          )
+          if not match or match[1] != "com.kkkunny.blt.tcl.stability" or match[3] != version:
+              raise SystemExit("APK package or version does not match the TV release")
+          name = f"blt-ng-{version}-armeabi-v7a.apk"
+          with apk.open("rb") as stream:
+              digest = hashlib.file_digest(stream, "sha256").hexdigest()
+          record = dict(packageName=match[1], version=version, versionCode=int(match[2]),
+                        apk=name, size=apk.stat().st_size, sha256=digest)
+          apk.rename("blt-payload.apk")
+          Path("blt-metadata.json").write_text(json.dumps(record) + "\n")
+          PY
+      - name: Publish to VPS
+        env:
+          DEPLOY_KEY: ${{ secrets.BLT_VPS_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.BLT_VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          cd "$RUNNER_TEMP"
+          printf '%s\n' "$DEPLOY_KEY" > blt-deploy-key
+          printf '%s\n' "$KNOWN_HOSTS" > blt-known-hosts
+          cat blt-metadata.json blt-payload.apk | ssh -T -i blt-deploy-key \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/blt-known-hosts" \
+            -o ConnectTimeout=15 blt-deploy@103.232.92.131
