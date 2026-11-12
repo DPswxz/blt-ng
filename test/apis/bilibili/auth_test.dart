@@ -79,9 +79,8 @@ void main() {
   group('checkQRStatus', () {
     const pollUrl =
         'https://passport.bilibili.com/x/passport-login/web/qrcode/poll';
-    const spiUrl = 'https://api.bilibili.com/x/frontend/finger/spi';
 
-    test('确认登录时解析 set-cookie 并补全 buvid', () async {
+    test('确认登录仅使用扫码返回的会话 Cookie', () async {
       final adapter = _mock();
       adapter.onGet(
         pollUrl,
@@ -97,22 +96,14 @@ void main() {
           },
         ),
       );
-      adapter.onGet(
-        spiUrl,
-        (server) => server.reply(200, {
-          'code': 0,
-          'data': {'b_3': 'buvid3-value', 'b_4': 'buvid4-value'},
-        }),
-      );
-
       final status = await checkQRStatus('key-1');
       expect(status.state, QRState.confirmed);
       expect(status.refreshToken, 'rt-1');
       final names = status.cookies.map((c) => c.name).toList();
-      expect(names, containsAll(['SESSDATA', 'buvid3', 'buvid4']));
+      expect(names, ['SESSDATA']);
     });
 
-    test('set-cookie 缺失时不崩溃，仅补全 buvid', () async {
+    test('确认后缺少登录 Cookie 会显示可读错误', () async {
       final adapter = _mock();
       adapter.onGet(
         pollUrl,
@@ -121,17 +112,16 @@ void main() {
           'data': {'code': 0, 'refresh_token': 'rt-1'},
         }),
       );
-      adapter.onGet(
-        spiUrl,
-        (server) => server.reply(200, {
-          'code': 0,
-          'data': {'b_3': 'b3', 'b_4': 'b4'},
-        }),
+      await expectLater(
+        checkQRStatus('key-1'),
+        throwsA(
+          isA<BilibiliError>().having(
+            (error) => error.message,
+            'message',
+            contains('未返回登录凭据'),
+          ),
+        ),
       );
-
-      final status = await checkQRStatus('key-1');
-      expect(status.state, QRState.confirmed);
-      expect(status.cookies.map((c) => c.name), ['buvid3', 'buvid4']);
     });
 
     test('等待扫码状态不请求 buvid', () async {

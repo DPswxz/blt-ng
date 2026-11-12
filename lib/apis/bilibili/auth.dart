@@ -109,7 +109,6 @@ Future<QRStatus> checkQRStatus(String key) async {
   );
   var qrStatus = QRStatus.fromJson(jsonMap(data) ?? const {});
   if (qrStatus.state == QRState.confirmed) {
-    _log.i('二维码已确认，登录成功');
     final cookies = respHeaders?['set-cookie'];
     final cookieList = <Cookie>[];
     for (final raw in cookies ?? const <String>[]) {
@@ -119,8 +118,12 @@ Future<QRStatus> checkQRStatus(String key) async {
         // 单条Cookie损坏时跳过，避免影响其它Cookie
       }
     }
-    final (buvid3, buvid4) = await getBuvids();
-    cookieList.addAll([Cookie('buvid3', buvid3), Cookie('buvid4', buvid4)]);
+    if (!cookieList.any(
+      (cookie) => cookie.name == 'SESSDATA' && cookie.value.isNotEmpty,
+    )) {
+      throw const BilibiliError(-2, '扫码已确认，但 B 站未返回登录凭据，请刷新二维码重试');
+    }
+    // The playback API obtains device identifiers when it needs them.
     qrStatus.cookies = cookieList;
   }
   return qrStatus;

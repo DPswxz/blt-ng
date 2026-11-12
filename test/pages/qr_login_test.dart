@@ -11,7 +11,6 @@ const _generateUrl =
     'https://passport.bilibili.com/x/passport-login/web/qrcode/generate';
 const _pollUrl =
     'https://passport.bilibili.com/x/passport-login/web/qrcode/poll';
-const _spiUrl = 'https://api.bilibili.com/x/frontend/finger/spi';
 const _navUrl = 'https://api.bilibili.com/x/web-interface/nav';
 
 // 打开登录弹窗
@@ -136,13 +135,6 @@ void main() {
           'set-cookie': ['SESSDATA=abc'],
         },
       ),
-    );
-    adapter.onGet(
-      _spiUrl,
-      (server) => server.reply(200, {
-        'code': 0,
-        'data': {'b_3': 'buvid3-value', 'b_4': 'buvid4-value'},
-      }),
     );
     adapter.onGet(
       _navUrl,

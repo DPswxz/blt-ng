@@ -119,7 +119,10 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
       final status = await checkQRStatus(qr.key);
       if (!mounted || !identical(qr, _qr)) return;
 
-      setState(() => _state = status.state);
+      setState(() {
+        _state = status.state;
+        _errorDetail = null;
+      });
       switch (status.state) {
         case QRState.confirmed:
           await _onLoginSuccess(status);
@@ -131,6 +134,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
       if (!mounted || !identical(qr, _qr)) return;
       setState(() {
         _state = QRState.error;
+        _errorDetail = errorMessage(e);
       });
     } finally {
       _isChecking = false;
@@ -144,6 +148,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
 
     try {
       final info = await getMySelfInfo(cookies: status.cookies);
+      if (!mounted) return;
       await saveSignedInAccount(
         info.loginProfile,
         status.cookies,
@@ -156,6 +161,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
       if (!mounted) return;
       setState(() {
         _state = QRState.error;
+        _errorDetail = errorMessage(e);
       });
     } finally {
       _isLoggingIn = false;
@@ -231,7 +237,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
         );
       case QRState.confirmed:
         return Text(
-          '登录成功',
+          '正在验证登录…',
           style: TextStyle(
             fontSize: 18 * ui,
             fontWeight: FontWeight.bold,
