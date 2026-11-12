@@ -124,6 +124,30 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
+class CustomSettingsActionTile extends StatelessWidget {
+  const CustomSettingsActionTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.onPressed,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => _SettingsTile(
+    leading: Icon(icon),
+    title: title,
+    subtitle: subtitle,
+    trailing: Icon(Icons.chevron_right, size: 28 * context.ui),
+    onSelect: onPressed,
+  );
+}
+
 // 开关设置项
 class CustomSettingsSwitchTile extends StatelessWidget {
   final Widget? leading;

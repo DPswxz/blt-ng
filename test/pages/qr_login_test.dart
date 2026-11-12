@@ -15,7 +15,10 @@ const _spiUrl = 'https://api.bilibili.com/x/frontend/finger/spi';
 const _navUrl = 'https://api.bilibili.com/x/web-interface/nav';
 
 // 打开登录弹窗
-Future<void> _openDialog(WidgetTester tester) async {
+Future<void> _openDialog(
+  WidgetTester tester, {
+  Size size = const Size(1920, 1080),
+}) async {
   await pumpPage(
     tester,
     Builder(
@@ -24,6 +27,7 @@ Future<void> _openDialog(WidgetTester tester) async {
         child: const Text('打开登录'),
       ),
     ),
+    size: size,
   );
   await tester.tap(find.text('打开登录'));
   await tester.pump();
@@ -32,33 +36,41 @@ Future<void> _openDialog(WidgetTester tester) async {
 void main() {
   setupPageTestEnv();
 
-  testWidgets('创建二维码失败展示错误与重试，重试成功后展示二维码', (tester) async {
-    var fail = true;
-    final adapter = mockHttp();
-    adapter.onGet(
-      _generateUrl,
-      (server) => server.replyCallback(200, (options) {
-        if (fail) return {'code': -400, 'message': '请求错误'};
-        return {
-          'code': 0,
-          'data': {
-            'qrcode_key': 'key-1',
-            'url': 'https://example.invalid/qr',
-          },
-        };
-      }),
-    );
+  for (final size in const [
+    Size(1280, 720),
+    Size(1920, 1080),
+    Size(3840, 2160),
+  ]) {
+    testWidgets('创建二维码失败显示原因，重试使用独立会话并显示二维码 $size', (tester) async {
+      var fail = true;
+      final adapter = mockHttp();
+      adapter.onGet(
+        _generateUrl,
+        (server) => server.replyCallback(200, (options) {
+          expect(options.headers['Cookie'], '');
+          expect(options.headers['Cache-Control'], contains('no-cache'));
+          if (fail) return {'code': -400, 'message': '请求错误'};
+          return {
+            'code': 0,
+            'data': {
+              'qrcode_key': 'key-1',
+              'url': 'https://example.invalid/qr',
+            },
+          };
+        }),
+      );
 
-    await _openDialog(tester);
-    await flush(tester);
-    expect(find.text('发生错误，请点击二维码重试'), findsOneWidget);
+      await _openDialog(tester, size: size);
+      await flush(tester);
+      expect(find.text('请求错误'), findsOneWidget);
 
-    fail = false;
-    await tester.tap(find.text('重试'));
-    await flush(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
-    expect(find.text('等待扫码'), findsOneWidget);
-  });
+      fail = false;
+      await tester.tap(find.text('重试'));
+      await flush(tester);
+      expect(find.byType(QrImageView), findsOneWidget);
+      expect(find.text('等待扫码'), findsOneWidget);
+    });
+  }
 
   testWidgets('轮询各状态：等待扫码 → 已扫码 → 过期', (tester) async {
     var pollCode = 86101;
@@ -67,10 +79,7 @@ void main() {
       _generateUrl,
       (server) => server.reply(200, {
         'code': 0,
-        'data': {
-          'qrcode_key': 'key-1',
-          'url': 'https://example.invalid/qr',
-        },
+        'data': {'qrcode_key': 'key-1', 'url': 'https://example.invalid/qr'},
       }),
     );
     adapter.onGet(
@@ -111,10 +120,7 @@ void main() {
       _generateUrl,
       (server) => server.reply(200, {
         'code': 0,
-        'data': {
-          'qrcode_key': 'key-1',
-          'url': 'https://example.invalid/qr',
-        },
+        'data': {'qrcode_key': 'key-1', 'url': 'https://example.invalid/qr'},
       }),
     );
     adapter.onGet(

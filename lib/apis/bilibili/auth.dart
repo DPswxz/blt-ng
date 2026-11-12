@@ -42,11 +42,15 @@ class QR {
   }
 }
 
+// QR requests belong to the new login, independent of the active account.
+const _qrRequestHeaders = {'Cookie': '', 'Cache-Control': 'no-cache, no-store'};
+
 // 创建二维码
 Future<QR> createQR() async {
   final data = await bilibiliRequest(
     'GET',
     'https://passport.bilibili.com/x/passport-login/web/qrcode/generate',
+    headers: _qrRequestHeaders,
   );
   return QR.fromJson(jsonMap(data) ?? const {});
 }
@@ -96,6 +100,7 @@ Future<QRStatus> checkQRStatus(String key) async {
   final data = await bilibiliRequest(
     'GET',
     'https://passport.bilibili.com/x/passport-login/web/qrcode/poll',
+    headers: _qrRequestHeaders,
     queries: {'qrcode_key': key},
     respHandler: (response) {
       respHeaders = response.headers;

@@ -9,6 +9,21 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val updater = AppUpdateInstaller(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "blt/update").setMethodCallHandler { call, result ->
+            if (call.method == "install") {
+                val path = call.argument<String>("path")
+                val version = call.argument<String>("version")
+                val versionCode = call.argument<Number>("versionCode")?.toLong()
+                if (path == null || version == null || versionCode == null) {
+                    result.error("invalid_arguments", "缺少安装包信息", null)
+                } else {
+                    updater.install(path, version, versionCode, result)
+                }
+            } else {
+                result.notImplemented()
+            }
+        }
         flutterEngine.platformViewsController.registry.registerViewFactory("blt/media3", TclPlayerFactory(flutterEngine.dartExecutor.binaryMessenger))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "blt/playback").setMethodCallHandler { call, result ->
             if (call.method != "supports") { result.notImplemented(); return@setMethodCallHandler }

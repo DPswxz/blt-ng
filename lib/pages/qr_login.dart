@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:blt/apis/bilibili/auth.dart';
 import 'package:blt/apis/bilibili/user.dart';
 import 'package:blt/storages/auth.dart' show saveSignedInAccount;
+import 'package:blt/utils/errors.dart';
 import 'package:blt/utils/ui_scale.dart';
+import 'package:dio/dio.dart';
 import 'package:blt/widgets/pink_style.dart';
 import 'package:dpad/dpad.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +50,7 @@ class _QrLoginWidget extends StatefulWidget {
 
 class _QrLoginWidgetState extends State<_QrLoginWidget> {
   QR? _qr;
+  String? _errorDetail;
   QRState _state = QRState.waiting;
   Timer? _pollTimer;
   bool _isRefreshing = false;
@@ -72,6 +75,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
     setState(() {
       _isRefreshing = true;
       _qr = null;
+      _errorDetail = null;
       _state = QRState.waiting;
     });
 
@@ -93,6 +97,10 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
       setState(() {
         _state = QRState.error;
         _isRefreshing = false;
+        final httpStatus = e is DioException ? e.response?.statusCode : null;
+        _errorDetail = httpStatus == null
+            ? errorMessage(e)
+            : '二维码请求失败（HTTP $httpStatus）';
       });
     }
   }
@@ -104,11 +112,12 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
 
   Future<void> _check() async {
     // 防止上一次轮询/登录未完成时并发重入
-    if (_qr == null || _isChecking || _isLoggingIn) return;
+    final qr = _qr;
+    if (qr == null || _isChecking || _isLoggingIn) return;
     _isChecking = true;
     try {
-      final status = await checkQRStatus(_qr!.key);
-      if (!mounted) return;
+      final status = await checkQRStatus(qr.key);
+      if (!mounted || !identical(qr, _qr)) return;
 
       setState(() => _state = status.state);
       switch (status.state) {
@@ -119,7 +128,7 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
         default:
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !identical(qr, _qr)) return;
       setState(() {
         _state = QRState.error;
       });
@@ -240,7 +249,10 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
         );
       case QRState.error:
         return Text(
-          '发生错误，请点击二维码重试',
+          _errorDetail ?? '发生错误，请点击二维码重试',
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 18 * ui,
             fontWeight: FontWeight.bold,

@@ -79,3 +79,20 @@
 使用 Flutter 与 Android 工具链构建，通过 `flutter build apk --release --split-per-abi --target-platform android-arm` 产出 ARMv7 APK。适配包应用 ID 为 `com.kkkunny.blt.tcl`，显示名称仍为 BLT，可与原版区分安装。
 
 原项目的基础介绍和上游资料请查看 [kkkunny/blt](https://github.com/kkkunny/blt)，并尊重原作者及所用依赖的许可与署名要求。
+
+## 应用内更新
+
+独立电视版可在「设置 → 检查更新」查看新版本，下载并打开 Android 系统安装器。首次安装需要在电视上允许 BLT 安装应用。
+
+默认更新清单位于 https://dpswxz.com/blt-updates/latest.json。自建更新源可以在构建时指定 `--dart-define=BLT_UPDATE_MANIFEST=https://你的域名/目录/latest.json`。
+
+发布时先上传与现有安装包同包名、同签名的新 APK，再替换同一 HTTPS 站点上的 `latest.json`。清单字段如下。
+
+| 字段 | 内容 |
+| --- | --- |
+| `packageName` | APK 的应用 ID |
+| `version` | APK 的版本名称 |
+| `versionCode` | APK 内的 Android 版本号，可用 `aapt dump badging` 查看 |
+| `apk` | 相对于清单的 APK 文件名 |
+| `size` | APK 的字节数 |
+| `sha256` | APK 的 SHA-256 十六进制摘要 |

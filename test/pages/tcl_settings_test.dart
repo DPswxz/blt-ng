@@ -8,10 +8,18 @@ import 'package:blt/storages/settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../helpers/page_test_env.dart';
 
 void main() {
   setupPageTestEnv();
+  PackageInfo.setMockInitialValues(
+    appName: 'blt-ng',
+    packageName: 'com.kkkunny.blt.tcl.stability',
+    version: '1.0.32',
+    buildNumber: '3056',
+    buildSignature: '',
+  );
   for (final size in const [
     Size(1280, 720),
     Size(1920, 1080),
@@ -42,7 +50,12 @@ void main() {
       await focusTile('弹幕屏蔽权重');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
+      expect(Focus.of(tester.element(find.text('检查更新'))).hasFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
       expect(controller.offset, controller.position.maxScrollExtent);
+      expect(find.textContaining('当前版本 1.0.32'), findsOneWidget);
+      expect(find.textContaining('服务器版本 待检查'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

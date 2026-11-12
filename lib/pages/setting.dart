@@ -1,9 +1,11 @@
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:blt/consts/settings.dart';
 import 'package:blt/widgets/playback_mode_icon.dart';
 import 'package:blt/consts/danmaku.dart';
 import 'package:blt/storages/settings.dart';
 import 'package:blt/utils/playback_policy.dart';
 import 'package:blt/utils/ui_scale.dart';
+import 'package:blt/widgets/app_update_dialog.dart';
 import 'package:blt/widgets/cache_future_builder.dart';
 import 'package:blt/widgets/custom_setting_tiles.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +21,8 @@ class SettingPage extends StatefulWidget {
 
 class _SettingPageState extends State<SettingPage> {
   final _scrollController = ScrollController();
+  late final Future<PackageInfo> _packageInfo = PackageInfo.fromPlatform();
+  String? _checkedVersion;
   int _quality = 80, _codec = 0;
   int _audio = 0;
   bool _danmakuEnabled = true;
@@ -279,21 +283,40 @@ class _SettingPageState extends State<SettingPage> {
                     Settings.setInt(Settings.pathDanmuSpeed, _speed);
                   }),
                 ),
+                CustomSettingsDropdownTile<int>(
+                  leading: const Icon(Icons.filter_alt_outlined),
+                  title: '弹幕屏蔽权重',
+                  subtitle: '权重越大，显示的弹幕越少。',
+                  value: _weight,
+                  items: List.generate(11, (i) => i),
+                  onChanged: (value) => setState(() {
+                    _weight = value;
+                    Settings.setInt(Settings.pathDanmuBlockWeightSwitch, value);
+                  }),
+                ),
+              ],
+            ),
+            SizedBox(height: 24 * ui),
+            CustomSettingsPanel(
+              children: [
                 _scrollBoundary(
                   top: false,
-                  child: CustomSettingsDropdownTile<int>(
-                    leading: const Icon(Icons.filter_alt_outlined),
-                    title: '弹幕屏蔽权重',
-                    subtitle: '权重越大，显示的弹幕越少。',
-                    value: _weight,
-                    items: List.generate(11, (i) => i),
-                    onChanged: (value) => setState(() {
-                      _weight = value;
-                      Settings.setInt(
-                        Settings.pathDanmuBlockWeightSwitch,
-                        value,
-                      );
-                    }),
+                  child: FutureBuilder<PackageInfo>(
+                    future: _packageInfo,
+                    builder: (context, snapshot) => CustomSettingsActionTile(
+                      icon: Icons.system_update_alt,
+                      title: '检查更新',
+                      subtitle:
+                          '当前版本 ${snapshot.data?.version ?? '—'}'
+                          '   ·   服务器版本 ${_checkedVersion ?? '待检查'}',
+                      onPressed: () => showAppUpdateDialog(
+                        context,
+                        onVersionChecked: (version) {
+                          if (mounted)
+                            setState(() => _checkedVersion = version);
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ],
