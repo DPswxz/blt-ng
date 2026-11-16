@@ -113,52 +113,73 @@ void main() {
     expect(find.text('二维码已过期，请点击二维码刷新'), findsOneWidget);
   });
 
-  testWidgets('确认登录后写入登录态并关闭弹窗', (tester) async {
-    final adapter = mockHttp();
-    adapter.onGet(
-      _generateUrl,
-      (server) => server.reply(200, {
-        'code': 0,
-        'data': {'qrcode_key': 'key-1', 'url': 'https://example.invalid/qr'},
-      }),
-    );
-    adapter.onGet(
-      _pollUrl,
-      (server) => server.reply(
-        200,
-        {
-          'code': 0,
-          'data': {'code': 0, 'refresh_token': 'rt-1'},
-        },
-        headers: {
-          Headers.contentTypeHeader: [Headers.jsonContentType],
-          'set-cookie': ['SESSDATA=abc'],
-        },
-      ),
-    );
-    adapter.onGet(
-      _navUrl,
-      (server) => server.reply(200, {
-        'code': 0,
-        'data': {
-          'mid': 123,
-          'uname': '登录用户',
-          'face': 'avatar.jpg',
-          'level_info': {'current_level': 6},
-        },
-      }),
-    );
+  for (final failFirst in [false, true]) {
+    testWidgets('确认登录后写入登录态并关闭弹窗，模拟首次验证失败：$failFirst', (tester) async {
+      var profileRequests = 0;
+      var generated = 0;
+      final adapter = mockHttp();
+      adapter.onGet(
+        _generateUrl,
+        (server) => server.replyCallback(200, (_) {
+          generated++;
+          return {
+            'code': 0,
+            'data': {
+              'qrcode_key': 'key-1',
+              'url': 'https://example.invalid/qr',
+            },
+          };
+        }),
+      );
+      adapter.onGet(
+        _pollUrl,
+        (server) => server.reply(
+          200,
+          {
+            'code': 0,
+            'data': {'code': 0, 'refresh_token': 'rt-1'},
+          },
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+            'set-cookie': ['SESSDATA=abc'],
+          },
+        ),
+      );
+      adapter.onGet(
+        _navUrl,
+        (server) => server.replyCallback(200, (options) {
+          expect(options.headers['Cookie'], 'SESSDATA=abc');
+          profileRequests++;
+          if (failFirst && profileRequests == 1) {
+            return {'code': -500, 'message': '服务暂时不可用'};
+          }
+          return {
+            'code': 0,
+            'data': {'mid': 123, 'uname': '登录用户', 'face': 'avatar.jpg'},
+          };
+        }),
+      );
 
-    await _openDialog(tester);
-    await flush(tester);
-    expect(find.byType(QrImageView), findsOneWidget);
+      await _openDialog(tester);
+      await flush(tester);
+      expect(find.byType(QrImageView), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 2));
-    await flush(tester);
+      await tester.pump(const Duration(seconds: 2));
+      await flush(tester);
 
-    expect(loginInfoNotifier.value.isLogin, true);
-    expect(loginInfoNotifier.value.mid, 123);
-    expect(find.text('打开登录'), findsOneWidget);
-    expect(find.byType(QrImageView), findsNothing);
-  });
+      if (failFirst) {
+        expect(find.text('重试登录'), findsOneWidget);
+        expect(find.text('服务暂时不可用'), findsOneWidget);
+        expect(loginInfoNotifier.value.isLogin, isFalse);
+        await selectFocusable(tester, find.text('重试登录'));
+        await flush(tester);
+      }
+      expect(generated, 1);
+      expect(profileRequests, failFirst ? 2 : 1);
+      expect(loginInfoNotifier.value.isLogin, true);
+      expect(loginInfoNotifier.value.mid, 123);
+      expect(find.text('打开登录'), findsOneWidget);
+      expect(find.byType(QrImageView), findsNothing);
+    });
+  }
 }

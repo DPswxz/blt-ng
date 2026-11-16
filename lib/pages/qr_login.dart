@@ -1,3 +1,4 @@
+import 'package:blt/apis/bilibili/error.dart';
 import 'dart:async';
 
 import 'package:blt/apis/bilibili/auth.dart';
@@ -50,6 +51,7 @@ class _QrLoginWidget extends StatefulWidget {
 
 class _QrLoginWidgetState extends State<_QrLoginWidget> {
   QR? _qr;
+  QRStatus? _confirmedStatus;
   String? _errorDetail;
   QRState _state = QRState.waiting;
   Timer? _pollTimer;
@@ -70,11 +72,12 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
   }
 
   Future<void> _refreshQR() async {
-    if (_isRefreshing) return;
+    if (_isRefreshing || _isLoggingIn) return;
 
     setState(() {
       _isRefreshing = true;
       _qr = null;
+      _confirmedStatus = null;
       _errorDetail = null;
       _state = QRState.waiting;
     });
@@ -143,8 +146,13 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
 
   Future<void> _onLoginSuccess(QRStatus status) async {
     if (_isLoggingIn) return;
-    _isLoggingIn = true;
     _pollTimer?.cancel();
+    setState(() {
+      _isLoggingIn = true;
+      _confirmedStatus = status;
+      _state = QRState.confirmed;
+      _errorDetail = null;
+    });
 
     try {
       final info = await getMySelfInfo(cookies: status.cookies);
@@ -161,16 +169,39 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
       if (!mounted) return;
       setState(() {
         _state = QRState.error;
-        _errorDetail = errorMessage(e);
+        if (e is BilibiliError && e.code == -101) {
+          _confirmedStatus = null;
+          _errorDetail = '登录凭据已失效，请刷新二维码重新扫码';
+        } else {
+          _errorDetail = errorMessage(e);
+        }
+        _isLoggingIn = false;
       });
-    } finally {
-      _isLoggingIn = false;
     }
   }
 
   Widget _buildQrCode() {
     final ui = context.ui;
     final size = 260.0 * ui;
+
+    final confirmed = _confirmedStatus;
+    if (_isLoggingIn || confirmed != null) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: _isLoggingIn
+              ? const CircularProgressIndicator()
+              : PinkButton(
+                  ui: ui,
+                  label: '重试登录',
+                  autofocus: true,
+                  icon: Icons.refresh_rounded,
+                  onPressed: () => _onLoginSuccess(confirmed!),
+                ),
+        ),
+      );
+    }
 
     if (_qr == null) {
       if (_state == QRState.error) {
@@ -279,7 +310,9 @@ class _QrLoginWidgetState extends State<_QrLoginWidget> {
         _buildStatusText(),
         SizedBox(height: 8 * ui),
         Text(
-          '使用哔哩哔哩 App 扫描二维码登录\n点击二维码可刷新',
+          _confirmedStatus == null
+              ? '使用哔哩哔哩 App 扫描二维码登录\n点击二维码可刷新'
+              : '扫码已确认，网络恢复后可重试登录',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey.shade500, fontSize: 14 * ui),
         ),
